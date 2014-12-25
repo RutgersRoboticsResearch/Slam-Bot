@@ -107,7 +107,7 @@ void loop() {
     Serial.readBytesUntil('\n', &buf[strlen(buf)], 128);
     if (strlen(buf) > 128) {
       memmove(buf, &buf[strlen(buf) - 64], 64);
-      buf[128] = '\0';
+      buf[64] = '\0';
     }
     char *ending;
     if ((ending = strchr(buf, '\n'))) {
