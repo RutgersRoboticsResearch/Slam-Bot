@@ -10,14 +10,14 @@
 #include "serial.h"
 
 #define INPUT_DIR "/dev/"
-static char *PREFIXES[3] = {
+static const char *PREFIXES[3] = {
   "ttyACM",
   "ttyUSB",
   NULL
 };
 
 static void *_serial_update(void *connection);
-static int setSerAttr(serial_t *connection);
+static int _serial_setattr(serial_t *connection);
 static char tempbuf[SWREADMAX];
 
 /** Connect to a serial device.
@@ -47,7 +47,7 @@ int serial_connect(serial_t *connection, char *port, int baudrate, int parity) {
     }
     connection->connected = 0;
     while ((ent = readdir(dp))) {
-      char *prefix;
+      const char *prefix;
       int i;
       hasPossibleSerial = 0;
       for (prefix = PREFIXES[(i = 0)]; prefix != NULL; prefix = PREFIXES[++i])
@@ -74,7 +74,7 @@ int serial_connect(serial_t *connection, char *port, int baudrate, int parity) {
   /* set connection attributes */
   connection->baudrate = baudrate;
   connection->parity = parity;
-  if (setSerAttr(connection) == -1)
+  if (_serial_setattr(connection) == -1)
     goto error; /* possible bad behavior */
   tcflush(connection->fd, TCIFLUSH);
   connection->connected = 1;
@@ -102,12 +102,12 @@ error:
 }
 
 /** Helper method to set the attributes of a serial connection,
- *  particularly for the arduino.
+ *  particularly for the arduino or similar device.
  *  @param connection
  *    the serial port to connect to
  *  @return 0 on success, -1 on failure
  */
-static int setSerAttr(serial_t *connection) {
+static int _serial_setattr(serial_t *connection) {
   struct termios tty;
   cfsetospeed(&tty, connection->baudrate);
   cfsetispeed(&tty, connection->baudrate);
@@ -152,7 +152,7 @@ static void *_serial_update(void *connection_arg) {
     } else {
       if (!connection->connected) {
         if ((connection->fd = open(connection->port, O_RDWR | O_NOCTTY | O_NDELAY)) != -1) {
-          if (setSerAttr(connection) == 0) {
+          if (_serial_setattr(connection) == 0) {
             connection->connected = 1;
           } else {
             close(connection->fd);
@@ -163,8 +163,6 @@ static void *_serial_update(void *connection_arg) {
     }
     if (!connection->connected)
       continue;
-
-    usleep(10 * 1E3);
 
     /* update buffer */
     if ((numAvailable = read(connection->fd, tempbuf, SWREADMAX)) > 0) {
@@ -181,9 +179,9 @@ static void *_serial_update(void *connection_arg) {
       /* get next message packet */
       if ((end_index = strrchr(connection->buffer, '\n'))) {
         end_index[0] = '\0';
+        end_index = &end_index[1];
         start_index = strrchr(connection->buffer, '\n');
         start_index = start_index ? &start_index[1] : connection->buffer;
-        end_index = &end_index[1];
         memcpy(connection->readbuf, start_index,
             (strlen(start_index) + 1) * sizeof(char));
         memmove(connection->buffer, end_index,
@@ -199,10 +197,15 @@ static void *_serial_update(void *connection_arg) {
 /** Read a string from the serial communication link.
  *  @param connection
  *    the serial connection to read a message from
- *  @return the readbuf
+ *  @return the readbuf if a message exists, else NULL
  */
 char *serial_read(serial_t *connection) {
-  return connection->readbuf;
+  if (connection->readAvailable) {
+    connection->readAvailable = 0;
+    return connection->readbuf;
+  } else {
+    return NULL;
+  }
 }
 
 /** Write a message to the serial communication link.
@@ -210,6 +213,8 @@ char *serial_read(serial_t *connection) {
  *    the serial communication link to write to
  *  @param message
  *    the message to send over to the other side
+ *  @note
+ *    be sure the message has a '\n' chararacter
  */
 void serial_write(serial_t *connection, char *message) {
   if (connection->fd != -1)

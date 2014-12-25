@@ -1,5 +1,5 @@
-#ifndef __serial_h__
-#define __serial_h__
+#ifndef serial_h
+#define serial_h
 
 #include <stdint.h>
 #include <pthread.h>

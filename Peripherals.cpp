@@ -1,18 +1,45 @@
 #include "Peripherals.h"
 #include <math.h>
+#include <stdio.h>
+#include <dirent.h>
+#include <fcntl.h>
 
+using namespace std;
+using namespace cv;
 using namespace rp::standalone::rplidar;
 
-Peripherals::Peripherals() {
+/** Constructor
+ */
+Peripherals::Peripherals(void) {
+  // connect to the lidar (be careful! teensy also uses usb)
   lidar_connected = connect_to_lidar();
-  serial_connect(&teensy, NULL, 57600);
+  if (lidar_connected)
+    printf("SUCCESS :: Lidar connected to %s\n", opt_com_path);
+  else
+    printf("ERROR :: Lidar not connected\n");
+  lidar_frame.create(640, 640, sizeof(double));
+
+  // connect to the teensy (care!)
+  serial_connect(&teensy, (char *)selectAnonymousPath("ttyACM").c_str(), TEENSY_BAUDRATE);
+  if (teensy.connected)
+    printf("SUCCESS :: Teensy connected to %s\n", teensy.port);
+  else
+    printf("ERROR :: Teensy not connected\n");
+
+  // connect to the camera
   cam.open(0);
-  lidar_frame.create(640, 640, CV_8UC3);
+  if (cam.isOpened())
+    printf("SUCCESS :: Camera connected\n");
+  else
+    printf("ERROR :: Camera not connected\n");
 }
 
-Peripherals::~Peripherals() {
+/** Destructor
+ */
+Peripherals::~Peripherals(void) {
   if (lidar_connected) {
     RPlidarDriver::DisposeDriver(lidar);
+    lidar = NULL;
     lidar_connected = false;
   }
   if (teensy.connected) {
@@ -23,95 +50,154 @@ Peripherals::~Peripherals() {
   }
 }
 
-bool Peripherals::connect_to_lidar() {
-  char *opt_com_path = selectAnonymousPath("ttyUSB");
+/** Get a frame from the lidar.
+ *  @return the matrix representing the frame
+ *  @note: memory usage high!
+ */
+Mat Peripherals::getLidarFrame(void) {
+  int minx = -1;
+  int maxx = 0;
+  int miny = -1;
+  int maxy = 0;
+  size_t nnodes = 720;
+  vector<int> x(nnodes, 0);
+  vector<int> y(nnodes, 0);
+  u_result op_result = lidar->grabScanData(lidar_nodes, nnodes);
+  if (IS_OK(op_result)) {
+    lidar->ascendScanData(lidar_nodes, nnodes);
+    for (int i = 0; i < nnodes; i++) {
+      lidar_angles[i] = (lidar_nodes[i].angle_q6_checkbit >>
+          RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0 + 270.0;
+      lidar_distances[i] = lidar_nodes[i].distance_q2 / 20.0;
+
+      x[i] = (int)(lidar_distances[i] *
+          cos(lidar_angles[i] * M_PI / 180.0));
+      y[i] = (int)(lidar_distances[i] *
+          sin(lidar_angles[i] * M_PI / 180.0));
+      lidar_frame.at<double>(y[i] + lidar_frame.cols / 2,
+          x[i] + lidar_frame.rows / 2) = 1.0;
+    }
+  }
+  return lidar_frame;
+}
+
+/** Get a frame from the camera.
+ *  @return the matrix representing the frame
+ */
+Mat Peripherals::getCameraFrame(void) {
+  if (cam.isOpened())
+    cam >> camera_frame;
+  return camera_frame;
+}
+
+/** Get the value of the left encoder.
+ *  @return the value of the left encoder
+ */
+long Peripherals::getLeftEncoder(void) {
+  readTeensyMessage();
+  return left_encoder;
+}
+
+/** Get the value of the right encoder.
+ *  @return the value of the right encoder
+ */
+long Peripherals::getRightEncoder(void) {
+  readTeensyMessage();
+  return right_encoder;
+}
+
+/** Set the value of the left motor.
+ *  @param velocity
+ *    the value of the left motor
+ */
+void Peripherals::setLeftMotor(int velocity) {
+  left_velocity = velocity;
+  writeTeensyMessage();
+}
+
+/** Set the value of the right motor.
+ *  @param velocity
+ *    the value of the right motor
+ */
+void Peripherals::setRightMotor(int velocity) {
+  right_velocity = velocity;
+  writeTeensyMessage();
+}
+
+/** Helper method to connect to the lidar device.
+ *  @return true if connected, else false
+ */
+bool Peripherals::connect_to_lidar(void) {
   int opt_com_baud = 115200;
-  uresult op_result;
 
-  if (!opt_com_path)
+  if (!(opt_com_path = (char *)selectAnonymousPath("ttyUSB").c_str()))
     return false;
 
-  lidar = RPlidarDriver::CreateDriver(RPlidarDriver::DRIVER_TYPE_SERIALPORT);
-  if (!lidar) {
+  if (!(lidar = RPlidarDriver::CreateDriver(RPlidarDriver::DRIVER_TYPE_SERIALPORT)))
+    return false;
+
+  if (IS_FAIL(lidar->connect(opt_com_path, opt_com_baud))) {
+    RPlidarDriver::DisposeDriver(lidar);
+    lidar = NULL;
     return false;
   }
 
-  if (IS_FAIL(lidar->connect(opt_com_path, opt_com_baudrate))) {
+  if (!checkRPLIDARHealth()) {
     RPlidarDriver::DisposeDriver(lidar);
-    return false;
-  }
-
-  if (!checkRPLIDARHealth(lidar)) {
-    RPlidarDriver::DisposeDriver(lidar);
+    lidar = NULL;
     return false;
   }
   
   return true;
 }
 
-bool Peripherals::checkRPLIDARHealth() {
+/** Helper method to check the lidar device health.
+ *  @return true if healthy, else false
+ */
+bool Peripherals::checkRPLIDARHealth(void) {
   u_result op_result;
   rplidar_response_device_health_t healthinfo;
-  opresult = drv->getHealth(healthinfo);
+  op_result = lidar->getHealth(healthinfo);
   if (IS_OK(op_result))
     return (healthinfo.status != RPLIDAR_STATUS_ERROR);
   else
     return false;
 }
 
-char *Peripherals::selectAnonymousPath(char *prefix) {
+/** Helper method to select a random path.
+ *  @param prefix
+ *    a prefix representing the beginning of the device name
+ *  @return a path to the device if found, NULL otherwise
+ */
+string Peripherals::selectAnonymousPath(string prefix) {
   DIR *device_dir;
   struct dirent *entry;
   device_dir = opendir("/dev");
   while ((entry = readdir(device_dir))) {
-    if (strstr(entry->d_name, prefix)) {
-      char *path = (char *)malloc(sizeof(char) * (strlen(entry->d_name) + strlen("/dev/") + 1));
-      sprintf(path, "/dev/%s", entry->d_name);
+    if (strstr(entry->d_name, prefix.c_str())) {
+      string path = string("/dev/") + string(entry->d_name);
       return path;
     }
   }
   return NULL;
 }
 
-Mat getCameraFrame() {
-  return cam.read();
-}
-
-Mat Peripherals::getLidarFrame() {
-  int count = 360 * 2;
-  rplidar_response_measurement_node_t nodes[count];
-
-  op_result = lidar->grabScanData(nodes, count);
-  if (IS_OK(op_result)) {
-    lidar->ascendScanData(nodes, count);
-    for (int pos = 0; pos < count; pos++) {
-      double theta = (nodes[pos].angle_q6_checkbit >>
-          RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0 + 270.0;
-      double distance = nodes[pos].distance_q2 / 20.0;
-
-      int x = (int)(distance * cos(theta * PI / 180.0));
-      int y = (int)(distance * sin(theta * PI / 180.0));
-      GaussMark(x + lidar_frame.cols / 2, y + lidar_frame.rows / 2);
-      
-    }
+/** Helper method to read a message from the teensy,
+ *  then decode it for values.
+ */
+void Peripherals::readTeensyMessage(void) {
+  if (teensy.readAvailable) {
+    const char *fmt = "TEENSY OUT %ld %ld";
+    char *msg = serial_read(&teensy);
+    sscanf(msg, fmt, &left_encoder, &right_encoder);
   }
 }
 
-void Peripherals::GaussMark(int x, int y) {
-  const int sample_size = 5;
-  double gauss_sample[sample_size][sample_size] = {
-    {0.0029150245, 0.0130642333, 0.0215392793, 0.0130642333, 0.0029150245},
-    {0.0130642333, 0.0585498315, 0.0965323526, 0.0585498315, 0.0130642333},
-    {0.0215392793, 0.0965323526, 0.1591549431, 0.0965323526, 0.0215392793},
-    {0.0130642333, 0.0585498315, 0.0965323526, 0.0585498315, 0.0130642333},
-    {0.0029150245, 0.0130642333, 0.0215392793, 0.0130642333, 0.0029150245}};
-  for (int i = 0; i < sample_size; i++) {
-    for (int j = 0; j < sample_size; j++) {
-      int lx = x + i - sample_size / 2;
-      int ly = y + j - sample_size / 2;
-      universe->set(lx, ly, (int)(gauss_sample[i][j] / 0.1591549431));
-    }
-  }
+/** Helper method to encode a message for the teensy,
+ *  then write it.
+ */
+void Peripherals::writeTeensyMessage(void) {
+  const char *fmt = "TEENSY IN %d %d\n";
+  sprintf(teensy_wbuf, fmt, left_velocity, right_velocity);
+  serial_write(&teensy, teensy_wbuf);
 }
-
-void Peripherals::

@@ -1,11 +1,26 @@
-CCFLAGS = `pkg-config --cflags opencv`
-LIBS = `pkg-config --libs opencv` -L$(shell pwd)/rplidar_sdk -lSDL -lpthread -lrplidar_sdk
+CC = g++
+CCFLAGS = -pedantic -std=c++11 \
+				`pkg-config --cflags opencv`
+LIBS = `pkg-config --libs opencv` \
+				-L$(shell pwd)/rplidar_sdk -lrplidar_sdk \
+				-lpthread -lSDL
 INCLUDE = -I$(shell pwd)/rplidar_sdk
+OBJECTS = serial.o Peripherals.o test.o
+TARGET = test
 
-all:
-	g++ $(CCFLAGS) -c Map.cpp $(INCLUDE)
-	g++ $(CCFLAGS) -c test.cpp $(INCLUDE)
-	g++ $(CCFLAGS) -o test Map.o test.o $(LIBS) $(INCLUDE)
+all: $(OBJECTS) $(TARGET)
+
+$(TARGET): $(OBJECTS)
+	$(CC) $(CCFLAGS) -o $(TARGET) $^ $(INCLUDE) $(LIBS)
+
+test.o: test.cpp
+	$(CC) $(CCFLAGS) -o $@ -c $< $(INCLUDE)
+
+serial.o: serial.c
+	$(CC) $(CCFLAGS) -o $@ -c $<
+
+Peripherals.o: Peripherals.cpp
+	$(CC) $(CCFLAGS) -o $@ -c $< $(INCLUDE)
 
 clean:
-	rm -f *o test
+	rm -f $(OBJECTS) $(TARGET)
