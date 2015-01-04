@@ -3,10 +3,14 @@ Model of computation
 
 [ Decision Engine ]
 -------------------
-[ Information Analysis ]
-<b>-------------------</b>
+<h2>Information Analysis</h2>
 
-[ Peripherals ]
+- SLAM
+- voice recognition?
+- object recognition?
+
+-------------------
+<h2>Peripherals</h2>
 
 Peripherals should have the following:
 - lidar
