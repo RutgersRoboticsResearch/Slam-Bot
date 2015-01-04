@@ -3,7 +3,6 @@
 class Encoder {
   public:
     long pos;
-    char velocity; // estimated
     bool reversed; // set
     char pin[2];
     Encoder() {
@@ -27,28 +26,40 @@ class Encoder {
       reversed = false;
       pin_state = 0;
     }
-  private:
     void update() {
-      if (pin[0] == 0 && pin[1] == 0) return;
-      char c = (digitalRead(pin[1]) == HIGH ? 1 : 0) +
-          (digitalRead(pin[0]) == HIGH ? 1 : 0) << 1;
-      char diff = (pin_state - c) * (reversed ? -1 : 1);
-      // FSA pos update
-      if (diff == 0) return;
-      if (diff == 2 || diff == -2) {
-        pos += 2 * velocity;
-      } else {
-        velocity = diff > 0 ? 1 : -1;
-        pos += velocity;
+      if (pin[0] == 0 || pin[1] == 0)
+        return;
+      // FSA : reg :: 00 01 11 10
+      //     : rev :: 00 10 11 01
+      char new_state =
+          (digitalRead(pin[0]) == HIGH ? 0x02 : 0x00) &
+          (digitalRead(pin[1]) == HIGH ? 0x01 : 0x00);
+      char delta_state = pin_state & new_state;
+      switch (delta_state) {
+        case 0x03:
+          pos += velocity * (reversed ? -1 : 1) * 2;
+          break;
+        case 0x02:
+          velocity = ((new_state & 0x02) >> 1 == new_state & 0x01) ? 1 : -1;
+          pos += velocity * (reversed ? -1 : 1);
+          break;
+        case 0x01:
+          velocity = ((new_state & 0x02) >> 1 == new_state & 0x01) ? -1 : 1;
+          pos += velocity * (reversed ? -1 : 1);
+          break;
+        default:
+          break;
       }
-      pin_state = c;
+      pin_state = new_state;
     }
+  private:
     char pin_state; // 0bxxxxxxAB, A = pin0, B = pin1
+    char velocity;  // estimated
 };
 
 class Motor { // HBridge implementation
   public:
-    short velocity; // PWM -256 to 256
+    short velocity; // PWM -255 to 255
     char pin[2];
     bool reversed;
     Motor() {

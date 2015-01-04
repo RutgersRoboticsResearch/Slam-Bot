@@ -1,6 +1,7 @@
 CC = g++
-CCFLAGS = -pedantic -std=c++11 \
-				`pkg-config --cflags opencv`
+CCFLAGS = \
+				`pkg-config --cflags opencv` \
+        #-pedantic -std=c++11
 LIBS = `pkg-config --libs opencv` \
 				-L$(shell pwd)/rplidar_sdk -lrplidar_sdk \
 				-lpthread -lSDL

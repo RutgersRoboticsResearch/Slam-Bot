@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <opencv2/highgui/highgui.hpp>
 #include <stdio.h>
-#include "Map.hpp"
+#include "Map.h"
 
 using namespace cv;
 using namespace std;

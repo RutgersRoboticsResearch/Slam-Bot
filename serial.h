@@ -26,6 +26,8 @@ typedef struct serial {
   char    buffer[SWBUFMAX];
   char    readbuf[SWREADMAX];
   int8_t  readAvailable;
+  int8_t  bitShift; /* why do we have to do this hack -_- */
+  int8_t  checkErr;
 } serial_t;
 
 int serial_connect(serial_t *connection, char *port, int baudrate, int parity = 0);

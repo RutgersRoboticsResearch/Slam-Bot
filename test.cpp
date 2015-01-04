@@ -1,6 +1,6 @@
 #include <SDL/SDL.h>
 #include "Peripherals.h"
-#include "Map.hpp"
+#include "Map.h"
 
 using namespace std;
 using namespace cv;
@@ -15,7 +15,7 @@ void set_pixel(SDL_Surface *surface, int x, int y, uint8_t r, uint8_t g, uint8_t
   pixels[surface->w * y + x] = color;
 }
 
-void DrawPartialUniverse(SDL_Surface *surface, Mat& data) {
+void blitMat(SDL_Surface *surface, Mat& data) {
   for (int x = 0; x < data.cols; x++) {
     for (int y = 0; y < data.rows; y++) {
       int c = (int)(data.at<double>(y, x) * 255.0);
@@ -25,7 +25,8 @@ void DrawPartialUniverse(SDL_Surface *surface, Mat& data) {
 }
 
 int main(int argc, char *argv[]) {
-  Peripherals p;
+  Peripherals::Lidar l;
+  Mat frame;
 
 #define WINDOW_SIZE 640
   SDL_Init(SDL_INIT_EVERYTHING);
@@ -35,14 +36,14 @@ int main(int argc, char *argv[]) {
   // fetch result and display
   while (running) {
     SDL_Event event;
-    while (SDL_PollEvent(&event)) {
+    if (SDL_PollEvent(&event)) {
       if (event.type == SDL_QUIT) {
         running = false;
         break;
       }
     }
-    Mat frame = p.getLidarFrame();
-    DrawPartialUniverse(screen, frame);
+    l >> frame;
+    blitMat(screen, frame);
     SDL_Flip(screen);
   }
   SDL_Quit();

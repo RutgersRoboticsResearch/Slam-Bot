@@ -81,6 +81,8 @@ int serial_connect(serial_t *connection, char *port, int baudrate, int parity) {
   memset(connection->buffer, 0, SWBUFMAX);
   memset(connection->readbuf, 0, SWREADMAX);
   connection->readAvailable = 0;
+  connection->bitShift = 0;
+  connection->checkErr = 0;
 
   /* start update thread */
   if (pthread_create(&connection->thread, NULL, _serial_update, (void *)connection) != 0)
@@ -173,10 +175,15 @@ static void *_serial_update(void *connection_arg) {
         memmove(connection->buffer, &connection->buffer[totalBytes],
             (SWBUFMAX - totalBytes) * sizeof(char));
         connection->buffer[SWBUFMAX - totalBytes] = '\0';
+        /* indicate that something wrong is going on */
+        checkErr = 1;
       }
       strcat(connection->buffer, tempbuf);
 
       /* get next message packet */
+      if (checkErr) {
+        /* check for custom signature, shift data if not found */
+      }
       if ((end_index = strrchr(connection->buffer, '\n'))) {
         end_index[0] = '\0';
         end_index = &end_index[1];
@@ -187,6 +194,7 @@ static void *_serial_update(void *connection_arg) {
         memmove(connection->buffer, end_index,
             (strlen(end_index) + 1) * sizeof(char));
         connection->readAvailable = 1;
+        checkErr = 0;
       }
     }
   }
