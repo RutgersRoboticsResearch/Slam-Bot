@@ -25,7 +25,7 @@ void blitMat(SDL_Surface *surface, Mat& data) {
 }
 
 int main(int argc, char *argv[]) {
-  Peripherals::Lidar l;
+  init_sensors();
   Mat frame;
 
 #define WINDOW_SIZE 640
@@ -42,10 +42,11 @@ int main(int argc, char *argv[]) {
         break;
       }
     }
-    l >> frame;
+    frame = get_lidar();
     blitMat(screen, frame);
     SDL_Flip(screen);
   }
   SDL_Quit();
+  destroy_sensors();
   return 0;
 }
