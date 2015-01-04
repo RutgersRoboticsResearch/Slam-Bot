@@ -1,7 +1,6 @@
 Model of computation
 ====================
 
--------------------
 [ Decision Engine ]
 -------------------
 [ Information Analysis ]
