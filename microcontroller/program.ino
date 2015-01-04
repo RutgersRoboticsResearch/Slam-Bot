@@ -109,7 +109,7 @@ void setup() {
 }
 
 void loop() {
-  Serial.print("Encoders: ");
+  Serial.print("TEENSY OUT ");
   Serial.print(left_encoder.read());
   Serial.print(" ");
   Serial.println(right_encoder.read());
@@ -118,17 +118,16 @@ void loop() {
     Serial.readBytesUntil('\n', &buf[strlen(buf)], 128);
     if (strlen(buf) > 128) {
       memmove(buf, &buf[strlen(buf) - 64], 64);
-      buf[128] = '\0';
+      buf[64] = '\0';
     }
     char *ending;
     if ((ending = strchr(buf, '\n'))) {
       ending[0] = '\0';
       int l = 0, r = 0;
-      sscanf(buf, "motors: %d %d", &l, &r);
+      sscanf(buf, "TEENSY IN %d %d", &l, &r);
       left_motor.setVelocity(l);
       right_motor.setVelocity(r);
-      memmove(buf, ending + sizeof(char),
-          strlen(ending + sizeof(char)) + sizeof(char));
+      memmove(buf, &ending[1], strlen(&ending[1]) + sizeof(char));
     }
   }
   left_motor.write();
