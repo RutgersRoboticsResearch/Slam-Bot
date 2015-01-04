@@ -182,7 +182,7 @@ static void *_serial_update(void *connection_arg) {
 
       /* get next message packet */
       if (checkErr) {
-        /* check for custom signature, shift data if not found */
+        /* check for custom signature, shift data if not found (bit bang?) */
       }
       if ((end_index = strrchr(connection->buffer, '\n'))) {
         end_index[0] = '\0';
