@@ -288,9 +288,9 @@ double Peripherals::Teensy::getCompass(void) {
  */
 void Peripherals::Teensy::read(void) {
   if (connection.readAvailable) {
-    const char *fmt = "TEENSY %ld %ld";
+    const char *fmt = "TEENSY %ld %ld %f";
     char *msg = serial_read(&connection);
-    sscanf(msg, fmt, &left_encoder, &right_encoder);
+    sscanf(msg, fmt, &left_encoder, &right_encoder, &compass);
   }
 }
 
