@@ -69,6 +69,14 @@ void Peripherals::set_right(int v) {
   Perry_Teensy->setRightMotor(v);
 }
 
+/** Destroy the sensors.
+ */
+void Peripherals::destroy_sensors(void) {
+  delete Perry_Lidar;
+  delete Perry_Teensy;
+  delete Perry_Camera;
+}
+
 /** Helper method for getting the names in a directory.
  *  @param path
  *    a string which the name of the path
