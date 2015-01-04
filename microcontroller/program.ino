@@ -26,6 +26,7 @@ class Encoder {
       reversed = false;
       pin_state = 0;
     }
+  private:
     void update() {
       if (pin[0] == 0 || pin[1] == 0)
         return;
@@ -52,7 +53,6 @@ class Encoder {
       }
       pin_state = new_state;
     }
-  private:
     char pin_state; // 0bxxxxxxAB, A = pin0, B = pin1
     char velocity;  // estimated
 };
