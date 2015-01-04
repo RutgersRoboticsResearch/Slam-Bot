@@ -109,7 +109,7 @@ void setup() {
 }
 
 void loop() {
-  Serial.print("TEENSY OUT ");
+  Serial.print("TEENSY ");
   Serial.print(left_encoder.read());
   Serial.print(" ");
   Serial.println(right_encoder.read());
@@ -124,7 +124,7 @@ void loop() {
     if ((ending = strchr(buf, '\n'))) {
       ending[0] = '\0';
       int l = 0, r = 0;
-      sscanf(buf, "TEENSY IN %d %d", &l, &r);
+      sscanf(buf, "TEENSY %d %d", &l, &r);
       left_motor.setVelocity(l);
       right_motor.setVelocity(r);
       memmove(buf, &ending[1], strlen(&ending[1]) + sizeof(char));
