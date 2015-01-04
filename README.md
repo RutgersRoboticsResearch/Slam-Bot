@@ -4,11 +4,9 @@ Model of computation
 [ Decision Engine ]
 -------------------
 [ Information Analysis ]
--------------------
+<b>-------------------</b>
+
 [ Peripherals ]
--------------------
-
-
 
 Peripherals should have the following:
 - lidar
@@ -56,3 +54,5 @@ These functions can be accessed via the following
 	set_left()
 	set_right()
 	destroy_sensors()
+
+-------------------
