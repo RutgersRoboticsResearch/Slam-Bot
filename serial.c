@@ -32,6 +32,7 @@ static char tempbuf[SWREADMAX];
  *  @return 0 on success, -1 on failure
  */
 int serial_connect(serial_t *connection, char *port, int baudrate, int parity) {
+  connection->connected = 0;
   if (port) {
     connection->port = (char *)malloc((strlen(port) + 1) * sizeof(char));
     strcpy(connection->port, port);
@@ -45,7 +46,6 @@ int serial_connect(serial_t *connection, char *port, int baudrate, int parity) {
       fprintf(stderr, "Cannot find directory %s to open serial connection\n", INPUT_DIR);
       return -1;
     }
-    connection->connected = 0;
     while ((ent = readdir(dp))) {
       const char *prefix;
       int i;
@@ -176,12 +176,12 @@ static void *_serial_update(void *connection_arg) {
             (SWBUFMAX - totalBytes) * sizeof(char));
         connection->buffer[SWBUFMAX - totalBytes] = '\0';
         /* indicate that something wrong is going on */
-        checkErr = 1;
+        connection->checkErr = 1;
       }
       strcat(connection->buffer, tempbuf);
 
       /* get next message packet */
-      if (checkErr) {
+      if (connection->checkErr) {
         /* check for custom signature, shift data if not found (bit bang?) */
       }
       if ((end_index = strrchr(connection->buffer, '\n'))) {
@@ -194,7 +194,7 @@ static void *_serial_update(void *connection_arg) {
         memmove(connection->buffer, end_index,
             (strlen(end_index) + 1) * sizeof(char));
         connection->readAvailable = 1;
-        checkErr = 0;
+        connection->checkErr = 0;
       }
     }
   }

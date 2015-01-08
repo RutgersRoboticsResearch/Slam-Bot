@@ -4,12 +4,34 @@
 #include <dirent.h>
 #include <fcntl.h>
 
+#define DEBUG 1
+
+/** General Objects
+ */
+Peripherals::Lidar *Peripherals::Perry_Lidar;
+Peripherals::Teensy *Peripherals::Perry_Teensy;
+Peripherals::Camera *Peripherals::Perry_Camera;
+
 /** Initialize the sensors.
  */
 void Peripherals::init_sensors(void) {
   Perry_Lidar = new Lidar();
   Perry_Teensy = new Teensy();
   Perry_Camera = new Camera();
+}
+
+/** Get the connection status.
+ *  @param l
+ *    the lidar int status (1 = success, 0 = failure)
+ *  @param l
+ *    the lidar int status (1 = success, 0 = failure)
+ *  @param l
+ *    the lidar int status (1 = success, 0 = failure)
+ */
+void Peripherals::get_connection_status(int& l, int& t, int& c) {
+  l = Perry_Lidar->status();
+  t = Perry_Teensy->status();
+  c = Perry_Camera->status();
 }
 
 /** Get a lidar frame.
@@ -22,14 +44,8 @@ cv::Mat Peripherals::get_lidar(void) {
 /** Get a vector of the measurements.
  *  @return vector of struct polar_coord
  */
-std::vector<polar_t> Peripherals::get_lidar_values(void) {
-  std::vector<polar_t> values(LidarDataCount, 0);
-  Perry_Lidar->read();
-  for (int i = 0; i < LidarDataCount; i++) {
-    values[i].radius = Perry_Lidar->distances[i];
-    values[i].degree = Perry_Lidar->angles[i];
-  }
-  return values;
+std::vector<Peripherals::polar_t> Peripherals::get_lidar_values(void) {
+  return Perry_Lidar->data();
 }
 
 /** Get the left encoder.
@@ -49,7 +65,7 @@ int Peripherals::get_right(void) {
 /** Get the compass value.
  *  @return a double representing the compass value
  */
-int Peripherals::get_compass(void) {
+double Peripherals::get_compass(void) {
   return Perry_Teensy->getCompass();
 }
 
@@ -106,7 +122,7 @@ std::vector<std::string> Peripherals::grep(
     std::string substring) {
   std::vector<std::string> newstringlist;
   for (int i = 0; i < stringlist.size(); i++)
-    if (stringlist[i].find(substring) != stringlist[i].length())
+    if (stringlist[i].find(substring) != std::string::npos)
       newstringlist.push_back(stringlist[i]);
   return newstringlist;
 }
@@ -116,9 +132,19 @@ std::vector<std::string> Peripherals::grep(
 Peripherals::Lidar::Lidar(void) {
   int opt_com_baud = 115200;
   std::vector<std::string> possible_devs = grep(ls("/dev/"), "ttyUSB");
-  if (possible_devs.size() == 0)
+  for (int i = 0; i < possible_devs.size(); i++) {
+    printf("possible dev: %s\n", (char *)possible_devs[i].c_str());
+  }
+  drv = NULL;
+  if (possible_devs.size() == 0) {
+    printf("Error: no devs found\n");
     return;
+  }
   opt_com_path = std::string("/dev/") + possible_devs[0];
+
+#ifdef DEBUG
+  printf("Trying to connect lidar to: %s\n", (char *)opt_com_path.c_str());
+#endif
 
   if (!(drv = RPlidarDriver::CreateDriver(RPlidarDriver::DRIVER_TYPE_SERIALPORT)))
     return;
@@ -135,7 +161,12 @@ Peripherals::Lidar::Lidar(void) {
     return;
   }
 
-  frame.create(LidarWindowWidth, LidarWindowHeight, sizeof(double));
+#ifdef DEBUG
+  printf("Connected!\n");
+#endif
+
+  drv->startScan();
+  frame.create(LidarWindowWidth, LidarWindowHeight, CV_8UC3);
 }
 
 /** Lidar Destructor
@@ -147,34 +178,84 @@ Peripherals::Lidar::~Lidar(void) {
   }
 }
 
+void clearFrame(cv::Mat& f) {
+  for (int i = 0; i < f.cols; i++) {
+    for (int j = 0; j < f.rows; j++) {
+      f.at<cv::Vec3b>(j, i) = cv::Vec3b(0, 0, 0);
+    }
+  }
+}
+
 /** Get a frame from the lidar.
  *  @return the matrix representing the frame
  *  @note: memory usage high!
  */
 cv::Mat Peripherals::Lidar::read(void) {
-  u_result op_result = drv->grabScanData(nodes, (size_t&)LidarDataCount);
+  clearFrame(frame);
+  printf("grab?\n");
+  size_t count = 720;
+  u_result op_result = drv->grabScanData(nodes, count);
+  printf("result ok?\n");
   if (IS_OK(op_result)) {
-    drv->ascendScanData(nodes, LidarDataCount);
-    for (int i = 0; i < LidarDataCount; i++) {
+#ifdef DEBUG
+    printf("scanning...\n");
+#endif
+    drv->ascendScanData(nodes, count);
+    printf("data->frame...\n");
+    /*for (int i = 0; i < (int)count; ++i) {
       angles[i] = (nodes[i].angle_q6_checkbit >>
-          RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0 + 270.0;
-      distances[i] = nodes[i].distance_q2 / 20.0;
-      x[i] = (int)(distances[i] * cos(angles[i] * M_PI / 180.0)) + frame.cols / 2;
-      y[i] = (int)(distances[i] * sin(angles[i] * M_PI / 180.0)) + frame.rows / 2;
-      if (x[i] >= 0 && x[i] < frame.cols / 2 && y[i] >= 0 && y[i] < frame.rows)
-        frame.at<double>(y[i], x[i]) = 1.0;
+          RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0f + 180.0;
+      distances[i] = nodes[i].distance_q2 / 20.0f;
+      x[i] = (int)(distances[i] * cos(angles[i] * 3.1415926535 / 180.0)) + frame.cols / 2;
+      y[i] = (int)(distances[i] * sin(angles[i] * 3.1415926535 / 180.0)) + frame.rows / 2;
+      if (x[i] >= 0 && x[i] < frame.cols / 2 && y[i] >= 0 && y[i] < frame.rows) {
+        frame.at<cv::Vec3b>(y[i], x[i])[0] = 255;
+ //       frame.at<cv::Vec3b>(y[i], x[i])[1] = 255;
+ //       frame.at<cv::Vec3b>(y[i], x[i])[2] = 255;
+      }
+    }*/
+    for (int pos = 0; pos < (int)count; ++pos) {
+      double theta = (nodes[pos].angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0f + 180.0;
+      double distance = nodes[pos].distance_q2 / 20.0f;
+      int x = (int)(distance * cos((double)theta * 3.14159 /180.0)) + 640 / 2;
+      int y = (int)(distance * sin((double)theta * 3.14159 /180.0)) + 640 / 2;
+      if (x >= 0 && x < 640 && y >= 0 && y < 640) {
+        frame.at<cv::Vec3b>(y, x) = cv::Vec3b(255, 255, 0);
+      }
     }
+    printf("done\n");
   }
   return frame;
 }
 
 /** Get a frame from the lidar.
- *  @param frame
+ *  @param dest
  *    a matrix representing the frame
  */
 void Peripherals::Lidar::operator>>(cv::Mat& dest) {
   read();
   frame.copyTo(dest);
+}
+
+/** Get the data from the lidar (polar values).
+ *  @return the vector of polar values
+ */
+std::vector<Peripherals::polar_t> Peripherals::Lidar::data(void) {
+  std::vector<Peripherals::polar_t> values(LidarDataCount, (Peripherals::polar_t){0});
+  Perry_Lidar->read();
+  for (int i = 0; i < LidarDataCount; i++) {
+    values[i].radius = Perry_Lidar->distances[i];
+    values[i].degree = Perry_Lidar->angles[i];
+  }
+  return values;
+}
+
+/** Get the data from the lidar (polar values).
+ *  @param dest
+ *    a vector representing the polar values
+ */
+void Peripherals::Lidar::operator>>(std::vector<polar_t>& dest) {
+  dest = data();
 }
 
 /** Helper method to check the lidar device health.
@@ -188,6 +269,13 @@ bool Peripherals::Lidar::checkRPLIDARHealth(void) {
     return (healthinfo.status != RPLIDAR_STATUS_ERROR);
   else
     return false;
+}
+
+/** Check status of the lidar.
+ *  @return success = 1, failure = 0
+ */
+int Peripherals::Lidar::status(void) {
+  return drv != NULL;
 }
 
 /** Camera Constructor
@@ -222,6 +310,7 @@ void Peripherals::Camera::operator>>(cv::Mat& dest) {
 }
 
 /** Helper method to merge string vectors.
+ *  @note: not used
  */
 std::vector<std::string> merge(
     std::vector<std::string> v1,
@@ -233,14 +322,34 @@ std::vector<std::string> merge(
   return v1;
 }
 
+/** Check status of the camera.
+ *  @return success = 1, failure = 0
+ */
+int Peripherals::Camera::status(void) {
+  return cam.isOpened();
+}
+
 /** Teensy Constructor
  */
 Peripherals::Teensy::Teensy(void) {
+  connection.connected = 0;
   std::vector<std::string> possible = ls("/dev/");
-  possible = merge(grep(possible, "ttyUSB"), grep(possible, "ttyACM"));
-  if (possible.size() == 0)
+  possible = grep(possible, "ttyACM");
+  if (possible.size() == 0) {
+    printf("Error: no devs found\n");
     return;
+  }
+
+#ifdef DEBUG
+  printf("Trying to connect teensy to: %s\n", (char *)possible[0].c_str());
+#endif
+
   serial_connect(&connection, (char *)possible[0].c_str(), TeensyBaudRate);
+
+#ifdef DEBUG
+  if (connection.connected)
+    printf("Connected!\n");
+#endif
 }
 
 /** Teensy Destructor
@@ -320,10 +429,17 @@ void Peripherals::Teensy::write(void) {
  *    the right bound
  *  @return the limited signal
  */
-int limit(int s, int a, int b) {
+int Peripherals::Teensy::limit(int s, int a, int b) {
   if (s < a)
     return a;
   if (b < s)
     return b;
   return s;
+}
+
+/** Check status of the teensy.
+ *  @return success = 1, failure = 0
+ */
+int Peripherals::Teensy::status(void) {
+  return connection.connected;
 }

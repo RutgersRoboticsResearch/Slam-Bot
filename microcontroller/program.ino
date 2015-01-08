@@ -100,10 +100,10 @@ Motor right_motor;
 char buf[256];
 
 void setup() {
-  left_encoder.setPins(13, 14);
-  right_encoder.setPins(15, 16);
-  left_motor.setPins(6, 7);
-  right_motor.setPins(8, 9);
+  left_encoder.setPins(9, 10);
+  right_encoder.setPins(11, 12);
+  left_motor.setPins(23, 22);
+  right_motor.setPins(21, 20);
   right_motor.reversed = true;
   Serial.begin(57600);
 }
