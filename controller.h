@@ -2,7 +2,6 @@
 #define controller_h
 
 #include <stdint.h>
-#include <pthread.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,10 +14,6 @@ typedef struct controller {
   int8_t  connected;  /* is the device connected */
   int32_t buttons;
   int32_t axes;
-
-  /* threaded update */
-  uint64_t  thread;
-  int8_t    alive;  /* 1 if alive, 0 if dead */
 
   /* values */
   int8_t  A;
@@ -45,6 +40,7 @@ typedef struct controller {
 
 /* Prototypes */
 void controller_connect(controller_t *ctrl);
+void controller_update(controller_t *ctrl);
 void controller_disconnect(controller_t *ctrl);
 
 #ifdef __cplusplus

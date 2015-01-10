@@ -6,7 +6,6 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <stdio.h>
-#include <pthread.h>
 #include "serial.h"
 
 #define INPUT_DIR "/dev/"
@@ -16,7 +15,6 @@ static const char *PREFIXES[3] = {
   NULL
 };
 
-static void *_serial_update(void *connection);
 static int _serial_setattr(serial_t *connection);
 static char tempbuf[SWREADMAX];
 
@@ -82,17 +80,11 @@ int serial_connect(serial_t *connection, char *port, int baudrate, int parity) {
   memset(connection->readbuf, 0, SWREADMAX);
   connection->readAvailable = 0;
 
-  /* start update thread */
-  if (pthread_create(&connection->thread, NULL, _serial_update, (void *)connection) != 0)
-    goto error; /* possible bad behavior */
-  connection->alive = 1;
-  printf("Connected to %s at %d\n", connection->port, connection->baudrate);
   return 0;
 
 error:
   fprintf(stderr, "Cannot connect to the device on %s\n", connection->port);
   connection->connected = 0;
-  connection->alive = 0;
   if (connection->fd != -1)
     close(connection->fd);
   connection->fd = -1;
@@ -129,69 +121,62 @@ static int _serial_setattr(serial_t *connection) {
 
 /** Threadable method to update the readbuf of the serial communication,
  *  as well as the connection itself.
- *  @param connection_arg
- *    the serial struct defined opaquely for thread function usage
- *  @return 0 on exit
+ *  @param connection
+ *    the serial struct
  *  @note
  *    the packets will be read in the following format:
  *    data\n
  *    however, the \n will be cut off
  */
-static void *_serial_update(void *connection_arg) {
-  serial_t *connection;
+void serial_update(serial_t *connection) {
   int numAvailable;
   int totalBytes;
 
-  connection = (serial_t *)connection_arg;
-  while (connection->alive) {
-    /* dynamically reconnect the device */
-    if (access(connection->port, O_RDWR) != 0) {
-      if (connection->connected) {
-        connection->connected = 0;
-        connection->fd = -1;
-      }
-    } else {
-      if (!connection->connected) {
-        if ((connection->fd = open(connection->port, O_RDWR | O_NOCTTY | O_NDELAY)) != -1) {
-          if (_serial_setattr(connection) == 0) {
-            connection->connected = 1;
-          } else {
-            close(connection->fd);
-            connection->fd = -1;
-          }
+  /* dynamically reconnect the device */
+  if (access(connection->port, O_RDWR) != 0) {
+    if (connection->connected) {
+      connection->connected = 0;
+      connection->fd = -1;
+    }
+  } else {
+    if (!connection->connected) {
+      if ((connection->fd = open(connection->port, O_RDWR | O_NOCTTY | O_NDELAY)) != -1) {
+        if (_serial_setattr(connection) == 0) {
+          connection->connected = 1;
+        } else {
+          close(connection->fd);
+          connection->fd = -1;
         }
       }
     }
-    if (!connection->connected)
-      continue;
+  }
+  if (!connection->connected)
+    return;
 
-    /* update buffer */
-    if ((numAvailable = read(connection->fd, tempbuf, SWREADMAX)) > 0) {
-      char *start_index, *end_index;
-      tempbuf[numAvailable] = '\0';
-      if ((totalBytes = strlen(connection->buffer) + numAvailable) >= SWBUFMAX) {
-        totalBytes -= SWBUFMAX - 1;
-        memmove(connection->buffer, &connection->buffer[totalBytes],
-            (SWBUFMAX - totalBytes) * sizeof(char));
-        connection->buffer[SWBUFMAX - totalBytes] = '\0';
-      }
-      strcat(connection->buffer, tempbuf);
+  /* update buffer */
+  if ((numAvailable = read(connection->fd, tempbuf, SWREADMAX)) > 0) {
+    char *start_index, *end_index;
+    tempbuf[numAvailable] = '\0';
+    if ((totalBytes = strlen(connection->buffer) + numAvailable) >= SWBUFMAX) {
+      totalBytes -= SWBUFMAX - 1;
+      memmove(connection->buffer, &connection->buffer[totalBytes],
+          (SWBUFMAX - totalBytes) * sizeof(char));
+      connection->buffer[SWBUFMAX - totalBytes] = '\0';
+    }
+    strcat(connection->buffer, tempbuf);
 
-      if ((end_index = strrchr(connection->buffer, '\n'))) {
-        end_index[0] = '\0';
-        end_index = &end_index[1];
-        start_index = strrchr(connection->buffer, '\n');
-        start_index = start_index ? &start_index[1] : connection->buffer;
-        memcpy(connection->readbuf, start_index,
-            (strlen(start_index) + 1) * sizeof(char));
-        memmove(connection->buffer, end_index,
-            (strlen(end_index) + 1) * sizeof(char));
-        connection->readAvailable = 1;
-      }
+    if ((end_index = strrchr(connection->buffer, '\n'))) {
+      end_index[0] = '\0';
+      end_index = &end_index[1];
+      start_index = strrchr(connection->buffer, '\n');
+      start_index = start_index ? &start_index[1] : connection->buffer;
+      memcpy(connection->readbuf, start_index,
+          (strlen(start_index) + 1) * sizeof(char));
+      memmove(connection->buffer, end_index,
+          (strlen(end_index) + 1) * sizeof(char));
+      connection->readAvailable = 1;
     }
   }
-  pthread_exit(NULL);
-  return NULL;
 }
 
 /** Read a string from the serial communication link.
@@ -226,11 +211,6 @@ void serial_write(serial_t *connection, char *message) {
  *    A pointer to the serial struct.
  */
 void serial_disconnect(serial_t *connection) {
-  if (connection->alive) {
-    connection->alive = 0;
-    pthread_join(connection->thread, NULL);
-  }
-
   /* clean up */
   if (!connection->connected)
     return;

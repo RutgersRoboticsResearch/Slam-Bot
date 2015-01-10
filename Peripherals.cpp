@@ -32,6 +32,13 @@ void Peripherals::get_connection_status(int& l, int& t, int& c) {
   c = Perry_Camera->status();
 }
 
+/** Update all the Peripherals. (Just the teensy actually)
+ */
+void Peripherals::update(void) {
+  Perry_Teensy->write();
+  Perry_Teensy->read();
+}
+
 /** Get a lidar frame.
  *  @return a matrix representing the lidar frame
  */
@@ -328,7 +335,6 @@ Peripherals::Teensy::~Teensy(void) {
  *  @return the value of the left encoder
  */
 long Peripherals::Teensy::getLeftEncoder(void) {
-  read();
   return left_encoder;
 }
 
@@ -336,7 +342,6 @@ long Peripherals::Teensy::getLeftEncoder(void) {
  *  @return the value of the right encoder
  */
 long Peripherals::Teensy::getRightEncoder(void) {
-  read();
   return right_encoder;
 }
 
@@ -346,7 +351,6 @@ long Peripherals::Teensy::getRightEncoder(void) {
  */
 void Peripherals::Teensy::setLeftMotor(int velocity) {
   left_velocity = limit(velocity, -0xFF, 0xFF);
-  write();
 }
 
 /** Set the value of the right motor.
@@ -355,14 +359,12 @@ void Peripherals::Teensy::setLeftMotor(int velocity) {
  */
 void Peripherals::Teensy::setRightMotor(int velocity) {
   right_velocity = limit(velocity, -0xFF, 0xFF);
-  write();
 }
 
 /** Get the value of the compass x.
  *  @return the value of the compass x
  */
 double Peripherals::Teensy::getCompassX(void) {
-  read();
   return compass_x;
 }
 
@@ -370,7 +372,6 @@ double Peripherals::Teensy::getCompassX(void) {
  *  @return the value of the compass y
  */
 double Peripherals::Teensy::getCompassY(void) {
-  read();
   return compass_y;
 }
 
@@ -378,12 +379,11 @@ double Peripherals::Teensy::getCompassY(void) {
  *  then decode it for values.
  */
 void Peripherals::Teensy::read(void) {
+  serial_update(&connection);
   if (connection.readAvailable) {
-    const char *fmt = "TEENSY %ld %ld %f %f";
+    const char *fmt = "TEENSY %ld %ld";
     char *msg = serial_read(&connection);
-    sscanf(msg, fmt,
-        &left_encoder, &right_encoder,
-        &compass_x, &compass_y);
+    sscanf(msg, fmt, &left_encoder, &right_encoder);
   }
 }
 

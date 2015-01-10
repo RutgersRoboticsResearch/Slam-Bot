@@ -40,6 +40,8 @@ int main(int argc, char *argv[]) {
 
   // fetch result and display
   while (!exit_signal) {
+    controller_update(&ctrl);
+    Peripherals::update();
     frame = Peripherals::get_camera();
     imshow("hello", frame);
     printf("read: %d %d\n", Peripherals::get_left(), Peripherals::get_right());

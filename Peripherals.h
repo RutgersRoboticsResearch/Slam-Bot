@@ -14,6 +14,7 @@ namespace Peripherals {
   // main functions to use
   void init_sensors(void);
   void get_connection_status(int& l, int& t, int& c);
+  void update(void);
   cv::Mat get_lidar(void);
   std::vector<polar_t> get_lidar_values(void);
   cv::Mat get_camera(void);
@@ -75,10 +76,10 @@ namespace Peripherals {
       double getCompassX(void); // degrees
       double getCompassY(void); // degrees
       int status(void);
-    private:
-      serial_t connection;
       void read(void);
       void write(void);
+    private:
+      serial_t connection;
       int limit(int s, int a, int b);
       long left_encoder;
       long right_encoder;

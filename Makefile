@@ -4,7 +4,7 @@ CCFLAGS = \
         #-pedantic -std=c++11
 LIBS = `pkg-config --libs opencv` \
 				-L$(shell pwd)/rplidar_sdk -lrplidar_sdk \
-				-lpthread -lSDL
+        -lpthread
 INCLUDE = -I$(shell pwd)/rplidar_sdk
 OBJECTS = serial.o Peripherals.o controller.o test.o
 TARGET = test

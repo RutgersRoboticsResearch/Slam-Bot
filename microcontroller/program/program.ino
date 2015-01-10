@@ -259,9 +259,9 @@ char msg[64];
 void setup()
 { 
   Serial.begin(57600);
-  pinMode (STATUS_LED,OUTPUT);  // Status LED
+  pinMode(STATUS_LED, OUTPUT);  // Status LED
   
-  I2C_Init();
+/*  I2C_Init();
 
   Serial.println("Pololu MinIMU-9 + Arduino AHRS");
 
@@ -272,7 +272,7 @@ void setup()
   Accel_Init();
   Compass_Init();
   Gyro_Init();
-  
+  */
   left_encoder.setPins(21, 20);
   right_encoder.setPins(23, 22);
   right_encoder.reversed = true;
@@ -282,7 +282,7 @@ void setup()
   
   delay(20);
   
-  for(int i=0;i<32;i++)    // We take some readings...
+/*  for(int i=0;i<32;i++)    // We take some readings...
     {
     Read_Gyro();
     Read_Accel();
@@ -305,12 +305,12 @@ void setup()
     
   timer=millis();
   delay(20);
-  counter=0;
+  counter=0;*/
 }
 
 void loop() //Main Loop
 {
-  if((millis()-timer)>=20)  // Main loop runs at 50Hz
+/*  if((millis()-timer)>=20)  // Main loop runs at 50Hz
   {
     counter++;
     timer_old = timer;
@@ -341,15 +341,13 @@ void loop() //Main Loop
    
  //   printdata();
  
-  }
-    sprintf(msg, "TEENSY %d %d %f %f",
+  }*/
+  sprintf(msg, "TEENSY %d %d",
       left_motor.velocity,
-      right_motor.velocity,
-      c_magnetom_x,
-      c_magnetom_y);
-    Serial.println(msg);
+      right_motor.velocity);
+  Serial.println(msg);
     
-     int nbytes = 0;
+  int nbytes = 0;
   if ((nbytes = Serial.available())) {
     Serial.readBytesUntil('\n', &buf[strlen(buf)], 128);
     if (strlen(buf) > 128) {
