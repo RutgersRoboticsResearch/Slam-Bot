@@ -1,66 +1,63 @@
 #include <SDL/SDL.h>
+#include <signal.h>
+#include <time.h>
 #include "Peripherals.h"
-#include "Map.h"
+#include "controller.h"
 
 using namespace std;
 using namespace cv;
 
-void set_pixel(SDL_Surface *surface, int x, int y, uint8_t r, uint8_t g, uint8_t b) {
-  uint32_t *pixels = (uint32_t *)surface->pixels;
-  uint32_t color = SDL_ALPHA_OPAQUE << surface->format->Ashift + 
-      r << surface->format->Rshift +
-      g << surface->format->Gshift +
-      b << surface->format->Bshift;
-  pixels[surface->w * y + x] = color;
+static int exit_signal;
+void stopsig(int signo) {
+  exit_signal = 1;
 }
 
-void blitMat(SDL_Surface *surface, Mat& data) {
-  for (int x = 0; x < data.cols; x++) {
-    for (int y = 0; y < data.rows; y++) {
-      int c = (int)(data.at<cv::Vec3b>(y, x)[0]);
-      set_pixel(surface, x, y, c, c, c);
-    }
-  }
+int f(double x) {
+  if (x > 0.5)
+    return 255;
+  else if (x < -0.5)
+    return -255;
+  else
+    return 0;
 }
-
-
 
 int main(int argc, char *argv[]) {
+  signal(SIGINT, stopsig);
+
   Peripherals::init_sensors();
-  Mat frame;
   int l, t, c;
   Peripherals::get_connection_status(l, t, c);
   printf("status: l: %d, t: %d, c: %d\n", l, t, c);
 
-  unsigned long tt = 0;
-  char buf[256];
+  struct controller ctrl;
+  controller_connect(&ctrl);
+  printf("controller status: %d\n", ctrl.connected);
+  if (!ctrl.connected)
+    exit_signal = 1;
 
-  const int window_size = 640;
-  //SDL_Init(SDL_INIT_EVERYTHING);
-  //SDL_Surface *screen = SDL_SetVideoMode(window_size, window_size, 32, SDL_SWSURFACE);
-  bool running = true;
+  namedWindow("hello", CV_WINDOW_AUTOSIZE);
+  Mat frame;
 
   // fetch result and display
-  namedWindow("hello", CV_WINDOW_AUTOSIZE);
-  while (running) {
-    //SDL_Event event;
-    //if (SDL_PollEvent(&event)) {
-    //  if (event.type == SDL_QUIT) {
-    //    running = false;
-    //    break;
-    //  }
-    //}
-    printf("getting frame...\n");
-    *(Peripherals::Perry_Lidar) >> frame;
-    printf("got frame!\n");
+  while (!exit_signal) {
+    frame = Peripherals::get_camera();
     imshow("hello", frame);
-    sprintf(buf, "LIDAR_PIC%05ld.jpg", tt++);
-    imwrite(buf, frame);
+    printf("read: %d %d\n", Peripherals::get_left(), Peripherals::get_right());
+    
+    int leftspeed = f(ctrl.LJOY.y);
+    int rightspeed = f(ctrl.RJOY.y);
+    Peripherals::set_left(leftspeed);
+    Peripherals::set_right(rightspeed);
     waitKey(10);
-    //blitMat(screen, frame);
-    //SDL_Flip(screen);
+    struct timespec waittime;
+    waittime.tv_nsec = 5000000;
+    waittime.tv_sec = 0;
+    nanosleep(&waittime, NULL);
   }
-  //SDL_Quit();
+
+  printf("stopped\n");
+
+  controller_disconnect(&ctrl);
   Peripherals::destroy_sensors();
   return 0;
 }

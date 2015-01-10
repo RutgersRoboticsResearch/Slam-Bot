@@ -4,8 +4,6 @@
 #include <dirent.h>
 #include <fcntl.h>
 
-#define DEBUG 1
-
 /** General Objects
  */
 Peripherals::Lidar *Peripherals::Perry_Lidar;
@@ -48,6 +46,13 @@ std::vector<Peripherals::polar_t> Peripherals::get_lidar_values(void) {
   return Perry_Lidar->data();
 }
 
+/** Get a camera frame.
+ *  @return a matrix representing the camera frame
+ */
+cv::Mat Peripherals::get_camera(void) {
+  return Perry_Camera->read();
+}
+
 /** Get the left encoder.
  *  @return an integer representing the encoder
  */
@@ -62,11 +67,18 @@ int Peripherals::get_right(void) {
   return Perry_Teensy->getRightEncoder();
 }
 
-/** Get the compass value.
- *  @return a double representing the compass value
+/** Get the compass value x.
+ *  @return a double representing the compass value x
  */
-double Peripherals::get_compass(void) {
-  return Perry_Teensy->getCompass();
+double Peripherals::get_compass_x(void) {
+  return Perry_Teensy->getCompassX();
+}
+
+/** Get the compass value y.
+ *  @return a double representing the compass value y
+ */
+double Peripherals::get_compass_y(void) {
+  return Perry_Teensy->getCompassY();
 }
 
 /** Set the left hand side motors.
@@ -132,19 +144,10 @@ std::vector<std::string> Peripherals::grep(
 Peripherals::Lidar::Lidar(void) {
   int opt_com_baud = 115200;
   std::vector<std::string> possible_devs = grep(ls("/dev/"), "ttyUSB");
-  for (int i = 0; i < possible_devs.size(); i++) {
-    printf("possible dev: %s\n", (char *)possible_devs[i].c_str());
-  }
   drv = NULL;
-  if (possible_devs.size() == 0) {
-    printf("Error: no devs found\n");
+  if (possible_devs.size() == 0)
     return;
-  }
   opt_com_path = std::string("/dev/") + possible_devs[0];
-
-#ifdef DEBUG
-  printf("Trying to connect lidar to: %s\n", (char *)opt_com_path.c_str());
-#endif
 
   if (!(drv = RPlidarDriver::CreateDriver(RPlidarDriver::DRIVER_TYPE_SERIALPORT)))
     return;
@@ -161,12 +164,8 @@ Peripherals::Lidar::Lidar(void) {
     return;
   }
 
-#ifdef DEBUG
-  printf("Connected!\n");
-#endif
-
   drv->startScan();
-  frame.create(LidarWindowWidth, LidarWindowHeight, CV_8UC3);
+  frame.create(LidarWindowWidth, LidarWindowHeight, CV_8UC1);
 }
 
 /** Lidar Destructor
@@ -179,11 +178,9 @@ Peripherals::Lidar::~Lidar(void) {
 }
 
 void clearFrame(cv::Mat& f) {
-  for (int i = 0; i < f.cols; i++) {
-    for (int j = 0; j < f.rows; j++) {
-      f.at<cv::Vec3b>(j, i) = cv::Vec3b(0, 0, 0);
-    }
-  }
+  for (int i = 0; i < f.cols; i++)
+    for (int j = 0; j < f.rows; j++)
+      f.at<uint8_t>(j, i) = 0;
 }
 
 /** Get a frame from the lidar.
@@ -192,38 +189,19 @@ void clearFrame(cv::Mat& f) {
  */
 cv::Mat Peripherals::Lidar::read(void) {
   clearFrame(frame);
-  printf("grab?\n");
-  size_t count = 720;
+  size_t count = LidarDataCount;
   u_result op_result = drv->grabScanData(nodes, count);
-  printf("result ok?\n");
   if (IS_OK(op_result)) {
-#ifdef DEBUG
-    printf("scanning...\n");
-#endif
     drv->ascendScanData(nodes, count);
-    printf("data->frame...\n");
-    /*for (int i = 0; i < (int)count; ++i) {
+    for (int i = 0; i < count; i++) {
       angles[i] = (nodes[i].angle_q6_checkbit >>
-          RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0f + 180.0;
-      distances[i] = nodes[i].distance_q2 / 20.0f;
-      x[i] = (int)(distances[i] * cos(angles[i] * 3.1415926535 / 180.0)) + frame.cols / 2;
-      y[i] = (int)(distances[i] * sin(angles[i] * 3.1415926535 / 180.0)) + frame.rows / 2;
-      if (x[i] >= 0 && x[i] < frame.cols / 2 && y[i] >= 0 && y[i] < frame.rows) {
-        frame.at<cv::Vec3b>(y[i], x[i])[0] = 255;
- //       frame.at<cv::Vec3b>(y[i], x[i])[1] = 255;
- //       frame.at<cv::Vec3b>(y[i], x[i])[2] = 255;
-      }
-    }*/
-    for (int pos = 0; pos < (int)count; ++pos) {
-      double theta = (nodes[pos].angle_q6_checkbit >> RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0f + 180.0;
-      double distance = nodes[pos].distance_q2 / 20.0f;
-      int x = (int)(distance * cos((double)theta * 3.14159 /180.0)) + 640 / 2;
-      int y = (int)(distance * sin((double)theta * 3.14159 /180.0)) + 640 / 2;
-      if (x >= 0 && x < 640 && y >= 0 && y < 640) {
-        frame.at<cv::Vec3b>(y, x) = cv::Vec3b(255, 255, 0);
-      }
+          RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0 + 270.0;
+      distances[i] = nodes[i].distance_q2 / 20.0;
+      x[i] = (int)(distances[i] * cos(angles[i] * M_PI / 180.0)) + frame.cols / 2;
+      y[i] = (int)(distances[i] * sin(angles[i] * M_PI / 180.0)) + frame.rows / 2;
+      if (x[i] >= 0 && x[i] < frame.cols && y[i] >= 0 && y[i] < frame.rows)
+        frame.at<uint8_t>(y[i], x[i]) = 255;
     }
-    printf("done\n");
   }
   return frame;
 }
@@ -281,7 +259,7 @@ int Peripherals::Lidar::status(void) {
 /** Camera Constructor
  */
 Peripherals::Camera::Camera(void) {
-  cam.open(0);
+  cam.open(1);
 }
 
 /** Camera Destructor
@@ -335,21 +313,9 @@ Peripherals::Teensy::Teensy(void) {
   connection.connected = 0;
   std::vector<std::string> possible = ls("/dev/");
   possible = grep(possible, "ttyACM");
-  if (possible.size() == 0) {
-    printf("Error: no devs found\n");
+  if (possible.size() == 0)
     return;
-  }
-
-#ifdef DEBUG
-  printf("Trying to connect teensy to: %s\n", (char *)possible[0].c_str());
-#endif
-
-  serial_connect(&connection, (char *)possible[0].c_str(), TeensyBaudRate);
-
-#ifdef DEBUG
-  if (connection.connected)
-    printf("Connected!\n");
-#endif
+  serial_connect(&connection, (char *)(std::string("/dev/") + possible[0]).c_str(), TeensyBaudRate);
 }
 
 /** Teensy Destructor
@@ -392,12 +358,20 @@ void Peripherals::Teensy::setRightMotor(int velocity) {
   write();
 }
 
-/** Get the value of the compass.
- *  @return the value of the compass
+/** Get the value of the compass x.
+ *  @return the value of the compass x
  */
-double Peripherals::Teensy::getCompass(void) {
+double Peripherals::Teensy::getCompassX(void) {
   read();
-  return compass;
+  return compass_x;
+}
+
+/** Get the value of the compass y.
+ *  @return the value of the compass y
+ */
+double Peripherals::Teensy::getCompassY(void) {
+  read();
+  return compass_y;
 }
 
 /** Helper method to read a message from the teensy,
@@ -405,9 +379,11 @@ double Peripherals::Teensy::getCompass(void) {
  */
 void Peripherals::Teensy::read(void) {
   if (connection.readAvailable) {
-    const char *fmt = "TEENSY %ld %ld %f";
+    const char *fmt = "TEENSY %ld %ld %f %f";
     char *msg = serial_read(&connection);
-    sscanf(msg, fmt, &left_encoder, &right_encoder, &compass);
+    sscanf(msg, fmt,
+        &left_encoder, &right_encoder,
+        &compass_x, &compass_y);
   }
 }
 

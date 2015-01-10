@@ -6,7 +6,7 @@ LIBS = `pkg-config --libs opencv` \
 				-L$(shell pwd)/rplidar_sdk -lrplidar_sdk \
 				-lpthread -lSDL
 INCLUDE = -I$(shell pwd)/rplidar_sdk
-OBJECTS = serial.o Peripherals.o test.o
+OBJECTS = serial.o Peripherals.o controller.o test.o
 TARGET = test
 
 all: $(OBJECTS) $(TARGET)
@@ -17,8 +17,11 @@ $(TARGET): $(OBJECTS)
 test.o: test.cpp
 	$(CC) $(CCFLAGS) -o $@ -c $< $(INCLUDE)
 
+controller.o: controller.c
+	$(CC) -o $@ -c $<
+
 serial.o: serial.c
-	$(CC) $(CCFLAGS) -o $@ -c $<
+	$(CC) -o $@ -c $<
 
 Peripherals.o: Peripherals.cpp
 	$(CC) $(CCFLAGS) -o $@ -c $< $(INCLUDE)

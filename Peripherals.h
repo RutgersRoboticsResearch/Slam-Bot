@@ -19,7 +19,8 @@ namespace Peripherals {
   cv::Mat get_camera(void);
   int get_left(void);
   int get_right(void);
-  double get_compass(void);
+  double get_compass_x(void);
+  double get_compass_y(void);
   void set_left(int v);
   void set_right(int v);
   void destroy_sensors(void);
@@ -71,7 +72,8 @@ namespace Peripherals {
       long getRightEncoder(void);
       void setLeftMotor(int velocity); // -255 to 255
       void setRightMotor(int velocity); // -255 to 255
-      double getCompass(void); // degrees
+      double getCompassX(void); // degrees
+      double getCompassY(void); // degrees
       int status(void);
     private:
       serial_t connection;
@@ -82,7 +84,8 @@ namespace Peripherals {
       long right_encoder;
       int left_velocity;
       int right_velocity;
-      double compass;
+      double compass_x;
+      double compass_y;
       char wbuf[128];
   };
 
