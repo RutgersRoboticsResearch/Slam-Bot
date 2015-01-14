@@ -1,5 +1,7 @@
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -117,6 +119,20 @@ static int _serial_setattr(serial_t *connection) {
   if (tcsetattr(connection->fd, TCSANOW, &tty) == -1)
     return -1;
   return 0;
+}
+
+/** Hacky way to sync serial via python script.
+ */
+void serial_sync(serial_t *connection) {
+  int pid;
+  pid = fork();
+  if (pid == 0) {
+    char numbuf[16];
+    sprintf(numbuf, "%d", connection->baudrate);
+    execlp("python", "python", "syncserial.py", connection->port, numbuf, NULL);
+  } else {
+    waitpid(pid, NULL, 0);
+  }
 }
 
 /** Threadable method to update the readbuf of the serial communication,

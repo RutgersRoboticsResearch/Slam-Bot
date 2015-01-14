@@ -2,9 +2,9 @@
 #define serial_h
 
 #include <stdint.h>
-#define SWBUFMAX    256
-#define SWREADMAX   128
-#define SWWRITEMAX  128
+#define SWBUFMAX    64
+#define SWREADMAX   32
+#define SWWRITEMAX  32
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,6 +24,7 @@ typedef struct serial {
 } serial_t;
 
 int serial_connect(serial_t *connection, char *port, int baudrate, int parity = 0);
+void serial_sync(serial_t *connection);
 void serial_update(serial_t *connection);
 char *serial_read(serial_t *connection);
 void serial_write(serial_t *connection, char *message);

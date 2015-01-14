@@ -323,6 +323,7 @@ Peripherals::Teensy::Teensy(void) {
   if (possible.size() == 0)
     return;
   serial_connect(&connection, (char *)(std::string("/dev/") + possible[0]).c_str(), TeensyBaudRate);
+  serial_sync(&connection);
 }
 
 /** Teensy Destructor
@@ -381,7 +382,7 @@ double Peripherals::Teensy::getCompassY(void) {
 void Peripherals::Teensy::read(void) {
   serial_update(&connection);
   if (connection.readAvailable) {
-    const char *fmt = "TEENSY %ld %ld";
+    const char *fmt = "[%ld %ld]";
     char *msg = serial_read(&connection);
     sscanf(msg, fmt, &left_encoder, &right_encoder);
   }
@@ -391,7 +392,7 @@ void Peripherals::Teensy::read(void) {
  *  then write it.
  */
 void Peripherals::Teensy::write(void) {
-  const char *fmt = "TEENSY %d %d\n";
+  const char *fmt = "[%d %d]\n";
   sprintf(wbuf, fmt, left_velocity, right_velocity);
   serial_write(&connection, wbuf);
 }

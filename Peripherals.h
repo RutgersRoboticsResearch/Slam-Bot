@@ -1,6 +1,7 @@
 #ifndef Peripherals_hpp
 #define Peripherals_hpp
 
+#include <stdlib.h>
 #include "serial.h"
 #include "rplidar.h"
 #include <opencv2/core/core.hpp>
@@ -30,7 +31,7 @@ namespace Peripherals {
   const int LidarWindowWidth = 640;
   const int LidarWindowHeight = 640;
   const int LidarDataCount = 720;
-  const int TeensyBaudRate = 57600;
+  const int TeensyBaudRate = 38400;
 
   // general functions
   std::vector<std::string> ls(std::string path);
