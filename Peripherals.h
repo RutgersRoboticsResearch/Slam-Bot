@@ -14,30 +14,42 @@ namespace Peripherals {
 
   // main functions to use
   void init_sensors(void);
-  void get_connection_status(int& l, int& t, int& c);
+  void get_connection_status(int& l, int& c, int& a);
   void update(void);
+  void flush(void);
   cv::Mat get_lidar(void);
   std::vector<polar_t> get_lidar_values(void);
   cv::Mat get_camera(void);
   int get_left(void);
   int get_right(void);
-  double get_compass_x(void);
-  double get_compass_y(void);
+  int get_base(void);
+  int get_elbow(void);
+  int get_rotate(void);
+  int get_claw_left(void);
+  int get_claw_right(void);
   void set_left(int v);
   void set_right(int v);
+  void set_base(int v);
+  void set_elbow(int v);
+  void set_rotate(int v);
+  void set_claw_left(int v);
+  void set_claw_right(int v);
   void destroy_sensors(void);
 
   // constants
   const int LidarWindowWidth = 640;
   const int LidarWindowHeight = 640;
   const int LidarDataCount = 720;
-  const int TeensyBaudRate = 38400;
+  const int SerialBaudRate = 38400;
+  const int SerialCount = 2;
+  const int SerialBufSize = 96;
 
   // general functions
   std::vector<std::string> ls(std::string path);
   std::vector<std::string> grep(
       std::vector<std::string> stringlist,
       std::string substring);
+  int limit(int input, int minimum, int maximum);
 
   // general structs and classes
   struct polar_coord {
@@ -66,47 +78,28 @@ namespace Peripherals {
       rplidar_response_measurement_node_t nodes[Peripherals::LidarDataCount];
   };
 
-  class Teensy {
-    public:
-      Teensy(void);
-      ~Teensy(void);
-      long getLeftEncoder(void);
-      long getRightEncoder(void);
-      void setLeftMotor(int velocity); // -255 to 255
-      void setRightMotor(int velocity); // -255 to 255
-      double getCompassX(void); // degrees
-      double getCompassY(void); // degrees
-      int status(void);
-      void read(void);
-      void write(void);
-    private:
-      serial_t connection;
-      int limit(int s, int a, int b);
-      long left_encoder;
-      long right_encoder;
-      int left_velocity;
-      int right_velocity;
-      double compass_x;
-      double compass_y;
-      char wbuf[128];
-  };
-
-  class Camera {
-    public:
-      Camera(void);
-      ~Camera(void);
-      cv::Mat read(void);
-      void operator>>(cv::Mat& dest);
-      int status(void);
-    private:
-      cv::VideoCapture cam;
-      cv::Mat frame;
-  };
-
   // general objects
   extern Lidar *Perry_Lidar;
-  extern Teensy *Perry_Teensy;
-  extern Camera *Perry_Camera;
+  extern cv::VideoCapture camera;
+  extern cv::Mat camera_frame;
+  extern serial_t connections[SerialCount];
+  extern int serial_ids[SerialCount];
+
+  extern int left_velocity;
+  extern int right_velocity;
+  extern int base_velocity;
+  extern int elbow_velocity;
+  extern int rotate_velocity;
+  extern int claw_left_velocity;
+  extern int claw_right_velocity;
+
+  extern int left_velocity_feedback;
+  extern int right_velocity_feedback;
+  extern int base_velocity_feedback;
+  extern int elbow_velocity_feedback;
+  extern int rotate_velocity_feedback;
+  extern int claw_left_velocity_feedback;
+  extern int claw_right_velocity_feedback;
 
 }
 

@@ -8,7 +8,7 @@ if len(sys.argv) != 3:
 
 s = serial.Serial(sys.argv[1], int(sys.argv[2]))
 if s.isOpen():
-  for i in range(50):
+  for i in range(10):
     s.readline()
   s.close()
 else:
