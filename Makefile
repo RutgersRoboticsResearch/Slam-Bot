@@ -6,15 +6,15 @@ LIBS = `pkg-config --libs opencv` \
 				-L$(shell pwd)/rplidar_sdk -lrplidar_sdk \
         -lpthread
 INCLUDE = -I$(shell pwd)/rplidar_sdk
-OBJECTS = serial.o Peripherals.o controller.o test.o
-TARGET = test
+OBJECTS = serial.o Peripherals.o controller.o agent.o
+TARGET = agent
 
 all: $(OBJECTS) $(TARGET)
 
 $(TARGET): $(OBJECTS)
 	$(CC) $(CCFLAGS) -o $(TARGET) $^ $(INCLUDE) $(LIBS)
 
-test.o: test.cpp
+agent.o: agent.cpp
 	$(CC) $(CCFLAGS) -o $@ -c $< $(INCLUDE)
 
 controller.o: controller.c

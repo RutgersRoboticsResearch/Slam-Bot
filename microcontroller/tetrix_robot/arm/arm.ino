@@ -76,7 +76,7 @@ void loop() { //Main Loop
     if ((e = strchr(buf, '\n'))) {
       e[0] = '\0';
       if ((s = strrchr(buf, '['))) {
-        // CUSTOMIZE
+        // CUSTOMIZED for speed
         for (int i = 0; i < 5; i++) {
           int startindex = i * 3 + 1;
           numbuf[0] = buf[startindex + 0];

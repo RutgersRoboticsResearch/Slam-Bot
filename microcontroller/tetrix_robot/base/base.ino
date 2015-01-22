@@ -104,14 +104,17 @@ void loop() { //Main Loop
     char *s, *e;
     if ((e = strchr(buf, '\n'))) {
       e[0] = '\0';
-      if ((s = strrchr(buf, '[')))
+      if ((s = strrchr(buf, '['))) {
         // CUSTOMIZE
         sscanf(s, "[%d %d]", &l, &r);
+        l = lim(l, -255, 255);
+        r = lim(r, -255, 255);
+      }
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
     }
   }
 
   // CUSTOMIZE
-  left_motor.write(lim(l, -255, 255));
-  right_motor.write(lim(r, -255, 255));
+  left_motor.write(l);
+  right_motor.write(r);
 }
