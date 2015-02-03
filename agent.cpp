@@ -38,7 +38,7 @@ void write_lidar_data(FILE *fp, string label, vector<Peripherals::polar_t>& data
   for (int i = 0; i < data.size(); i++) {
     if (data[i].radius == 0.0 && data[i].theta == 0.0)
       break;
-    fprintf(fp, "%f %f\n", data[i].theta, data[i].radius);
+    fprintf(fp, "%f %f\n", data[i].theta - 270.0, data[i].radius);
   }
 }
 
@@ -58,8 +58,8 @@ int main(int argc, char *argv[]) {
   struct controller ctrl;
   controller_connect(&ctrl);
   printf("controller status: %d\n", ctrl.connected);
-  if (!ctrl.connected)
-    exit_signal = 1;
+//  if (!ctrl.connected)
+//    exit_signal = 1;
 
   // timer stuff
   struct timeval start;
@@ -73,56 +73,47 @@ int main(int argc, char *argv[]) {
   int basetick = 0;
   int elbowtick = 0;
   int ticklimit = 2;
-//  namedWindow("Lidar", CV_WINDOW_AUTOSIZE);
   Mat framebuf;
   char label[256];
   int datac = 0;
   FILE *fp = fopen("LidarData.txt", "w");
 
-  printf("starting...\n");
   struct timespec waitme;
   waitme.tv_sec = 1;
   waitme.tv_nsec = 0;
-  //nanosleep(&waitme, NULL);
+//  nanosleep(&waitme, NULL);
 
   namedWindow("Lidar", CV_WINDOW_AUTOSIZE);
 
   // fetch result and display
   while (!exit_signal) {
     controller_update(&ctrl);
-    printf("updating...\n");
     Peripherals::update_sensors();
     gettimeofday(&end, NULL);
 
-    if (diffmillis(start, end) >= 100) { // 100Hz
-      printf("read...\n");
+    if (diffmillis(start, end) >= 100) { // 10Hz
       sprintf(label, "%05d.jpg", ++datac);
       vector<Peripherals::polar_t> values = Peripherals::get_lidar_values();
-      printf("writing?\n");
       write_lidar_data(fp, label, values);
-      printf("woot\n");
       framebuf = Peripherals::get_lidar_frame();
-      printf("yooyoyo\n");
       imshow("Lidar", framebuf);
       waitKey(1);
       imwrite(label, framebuf);
-      printf("done\n");
-      printf("read 1: %d %d\n",
+/*      printf("read 1: %d %d\n",
           Peripherals::get_wheel_left(),
           Peripherals::get_wheel_right());
-/*      printf("read 2: %d %d %d %d %d\n",
+      printf("read 2: %d %d %d %d %d\n",
           Peripherals::get_base(),
           Peripherals::get_elbow(),
           Peripherals::get_rotate(),
           Peripherals::get_claw_left(),
           Peripherals::get_claw_right());
 */
-      printf("write...\n");
       int leftspeed = f(ctrl.LJOY.y);
       int rightspeed = f(ctrl.RJOY.y);
-      printf("set 1: %d %d\n", leftspeed, rightspeed);
       Peripherals::set_wheel_left(leftspeed);
       Peripherals::set_wheel_right(rightspeed);
+      fprintf(fp, "vw = [%d %d]\n", leftspeed, rightspeed);
 
 /*      int rotationspeed = (g(ctrl.LEFT) - g(ctrl.RIGHT)) * 5;
       int leftclawspeed = (g(ctrl.LB) - g((ctrl.LT + 1.0) / 2)) / 10;
@@ -145,7 +136,7 @@ int main(int argc, char *argv[]) {
         }
       } else {
         elbowtick++;
-        elbowtick &= ticklimit;
+        elbowtick %= ticklimit;
       }
       Peripherals::set_base(basepos);
       Peripherals::set_elbow(elbowpos);
@@ -159,7 +150,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  printf("stopped\n");
   fclose(fp);
   controller_disconnect(&ctrl);
   Peripherals::destroy_sensors();

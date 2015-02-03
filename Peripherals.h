@@ -3,23 +3,23 @@
 
 #include <stdlib.h>
 #include <sys/time.h>
+#include <SDL.h>
 #include "serial.h"
 #include "rplidar.h"
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
 
-namespace Peripherals {
+namespace Peri {
 
   using namespace rp::standalone::rplidar;
   typedef struct polar_coord polar_t;
 
   // main functions to use
-  void init_sensors(void);
-  void update_sensors(void);
-  void flush_sensors(void);
-  cv::Mat& get_lidar_frame(void);
-  std::vector<polar_t>& get_lidar_values(void);
-  cv::Mat& get_camera(void);
+  void open_sensors(void);
+  void read_sensors(void);
+  void write_sensors(void);
+  void close_sensors(void);
+
+  SDL_Surface *get_lidar_frame(void);
+  std::vector<polar_t>& get_lidar_points(void); // pass in a size variable
   int get_wheel_left(void);
   int get_wheel_right(void);
   int get_base(void);
@@ -34,13 +34,14 @@ namespace Peripherals {
   void set_rotate(int v);
   void set_claw_left(int v);
   void set_claw_right(int v);
-  void destroy_sensors(void);
+
+  polar_t forward_kinematics(polar_t p1, polar_t p2);
+  vector<double> reverse_kinematics(polar_t p1, polar_t p2, polar_t dest);
 
   // constants
   const int LidarWindowWidth = 640;
   const int LidarWindowHeight = 640;
   const int SerialBaudRate = 38400;
-  const int SerialCount = 1;
   const int SerialBufSize = 96;
 
   // general functions
@@ -72,12 +73,11 @@ namespace Peripherals {
 
   // general objects
   extern Lidar *Perry_Lidar;
-  extern cv::VideoCapture camera;
-  extern cv::Mat camera_frame;
-  extern serial_t connections[SerialCount];
-  extern int serial_ids[SerialCount];
-  extern cv::Mat lidar_frame;
-  extern std::vector<polar_t> z;
+  extern SDL_Surface *lidar_frame;
+  extern std::vector<polar_t> lidar_points(720, (polar_t){0});
+  extern serial_t *connections;
+  extern int *connection_ids;
+  extern int num_connections;
 
   extern int wheel_left_velocity;
   extern int wheel_right_velocity;
