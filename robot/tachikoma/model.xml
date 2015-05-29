@@ -1,0 +1,18 @@
+{
+  "tachikoma": {
+    "links": {
+      "northwest_rot": {
+      },
+      "
+    }
+
+  <link name="base" />
+  <joint name="northeast_rot">
+    <type>
+      <
+  </joint>
+  <link name="northeast_leg" />
+  <link name="northwest_leg" />
+  <link name="southeast_leg" />
+  <link name="southwest_leg" />
+</robot>
