@@ -1,5 +1,5 @@
-#ifndef kinect_hpp
-#define kinect_hpp
+#ifndef __SB_KINECT_H__
+#define __SB_KINECT_H__
 
 #include <vector>
 #include <pthread.h>

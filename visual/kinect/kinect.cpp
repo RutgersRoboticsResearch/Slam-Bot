@@ -1,6 +1,6 @@
 #include <math.h>
 #include <stdio.h>
-#include "kinect.hpp"
+#include "kinect.h"
 
 using namespace cv;
 using namespace std;
