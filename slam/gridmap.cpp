@@ -1,180 +1,230 @@
+#include <sys/types.h>
 #include <dirent.h>
-#include <stdio.h>
+#include <cstdio>
+#include <cmath>
 #include <opencv2/highgui/highgui.hpp>
-#include <stdio.h>
+#include "imgfmt.h"
 #include "gridmap.h"
 
-using namespace cv;
-using namespace std;
+#define MAX_MAPS 64
 
-gridmap::gridmap(int min_x, int max_x, int min_y, int max_y) {
-  this->left_range = min_x;
-  this->right_range = max_x;
-  this->up_range = max_y;
-  this->down_range = min_y;
-  this->left = NULL;
-  this->right = NULL;
-  this->up = NULL;
-  this->down = NULL;
-  this->visited = false;
-  this->data.create(max_y - min_y, max_x - min_x, CV_8UC3);
-  for (int y = 0; y < (max_y - min_y); y++) {
-    for (int x = 0; x < (max_x - min_x); x++) {
-      this->data.at<Vec3b>(y, x) = Vec3b(0, 0, 0);
-    }
-  }
+static int nmaps;
+static double dummyval;
+static int limit(int x, int a, int b);
+
+Grid::Grid(void) {
+  this->init(0, 0, 64, 64);
 }
 
-gridmap::~gridmap() {
-  gridmap *ptr;
-  if ((ptr = this->left)) {
-    this->left->right = NULL;
-    this->left = NULL;
-    delete ptr;
-  }
-  if ((ptr = this->right)) {
-    this->right->left = NULL;
-    this->right = NULL;
-    delete ptr;
-  }
-  if ((ptr = this->up)) {
-    this->up->down = NULL;
-    this->up = NULL;
-    delete ptr;
-  }
-  if ((ptr = this->down)) {
-    this->down->up = NULL;
-    this->down = NULL;
-    delete ptr;
-  }
+Grid::Grid(int blocksize) {
+  this->init(0, 0, blocksize, blocksize);
 }
 
-void gridmap::set(int x, int y, int p) {
-  int width = right_range - left_range;
-  int height = up_range - down_range;
-  if (x < this->left_range) {
-    if (y < this->down_range && this->down) {
-      this->down->set(x, y, p);
-    } else if (y >= this->up_range && this->up) {
-      this->up->set(x, y, p);
-    } else {
-      if (!this->left) {
-        this->left = new gridmap(
-            this->left_range - width,
-            this->right_range - width,
-            this->down_range,
-            this->up_range);
-        this->left->right = this;
+Grid::Grid(int left, int right, int up, int down) {
+  this->init(left, right, up, down);
+}
+
+Grid::~Grid(void) {
+}
+
+bool Grid::inRange(const int row, const int col) {
+  return this->left <= col && col < this->right &&
+         this->down <= row && row < this->up;
+}
+
+void Grid::init(int left, int right, int up, int down) {
+  this->left = left;
+  this->right = right;
+  this->up = up;
+  this->down = down;
+  this->map = arma::zeros<arma::mat>(up - down, right - left);
+  this->env = NULL;
+  this->image_converted = false;
+}
+
+GridMap::GridMap(void) {
+  this->n_rows = 128;
+  this->n_cols = 128;
+}
+
+GridMap::GridMap(int blocksize) {
+  this->n_rows = blocksize;
+  this->n_cols = blocksize;
+}
+
+GridMap::~GridMap() {
+  for (int i = 0; i < this->grids.size(); i++) {
+    delete this->grids[i];
+  }
+  this->grids.clear();
+}
+
+double &GridMap::operator()(const int row, const int col) {
+  Grid *grid = NULL;
+  int beg = 0;
+  int mid;
+  int end = this->grids.size() - 1;
+  // try to find the grid item by using binary search
+  while (beg != end) {
+    if (beg + 1 == end) {
+      if (this->grids[beg]->inRange(row, col) {
+        grid = this->grids[beg];
+      } else if (this->grids[end]->inRange(row, col)) {
+        grid = this->grids[end];
       }
-      this->left->set(x, y, p);
+      break;
     }
-  } else if (x >= this->right_range) {
-    if (y < this->down_range && this->down) {
-      this->down->set(x, y, p);
-    } else if (y >= this->up_range && this->up) {
-      this->up->set(x, y, p);
+    mid = (beg + end) / 2;
+    if (this->grids[mid]->inRange(row, col)) {
+      grid = this->grids[mid];
+      break;
+    }
+    if (row < this->grids[mid]->down) {
+      end = mid;
+    } else if (this->grids[mid]->up <= row) {
+      beg = mid;
+    } else if (col < this->grids[mid]->left) {
+      end = mid;
+    } else if (this->grids[mid]->right <= col) {
+      beg = mid;
+    }
+  }
+  if (!grid) {
+    // create the grid item
+    int ltrunc = row / this->n_rows;
+    int rtrunc = ltrunc + 1;
+    int dtrunc = col / this->n_cols;
+    int utrunc = dtrunc + 1;
+    grid = new Grid(
+        ltrunc * this->n_rows,
+        rtrunc * this->n_rows,
+        utrunc * this->n_cols,
+        dtrunc * this->n_cols);
+    grid->env = this;
+    // insert the grid item
+    if (this->grids.size() == 0) {
+      this->grids.push_back(grid);
     } else {
-      if (!this->right) {
-        this->right = new gridmap(
-            this->left_range + width,
-            this->right_range + width,
-            this->down_range,
-            this->up_range);
-        this->right->left = this;
+      std::vector<Grid *>::iterator it;
+      if (row < this->grids[beg]->down) {
+        it = this->grids.begin() + beg;
+      } else if (this->grids[end]->up <= row) {
+        it = this->grids.begin() + end + 1;
+      } else if (col < this->grids[beg]->left) {
+        it = this->grids.begin() + beg;
+      } else if (this->grids[end]->right <= col) {
+        it = this->grids.begin() + end + 1;
+      } else {
+        // middle insert should only happen when beg != end
+        if (beg != end) {
+          it = this->grids.begin() + end;
+        } else {
+          // error: just insert it at the end
+          it = this->grids.end();
+        }
       }
-      this->right->set(x, y, p);
+      this->grids.insert(it, grid);
     }
-  } else if (y >= this->up_range) {
-    if (!this->up) {
-      this->up = new gridmap(
-          this->left_range,
-          this->right_range,
-          this->down_range + height,
-          this->up_range + height);
-      this->up->down = this;
+  }
+  grid->image_converted = false;
+  return grid->map(row, col);
+}
+
+void GridMap::load(const std::string &foldername) {
+  // refresh the grids vector
+  for (int i = 0; i < this->grids.size(); i++) {
+    delete this->grids[i];
+  }
+  this->grids.clear();
+  // read and insert all the grids
+  std::string infoname = foldername + "/info.txt";
+  FILE *fp;
+  if ((fp = fopen(infoname.c_str(), "r"))) {
+    char *line = NULL;
+    size_t n;
+    int left;
+    int right;
+    int up;
+    int down;
+    while (getline(&line, &n, fp) != -1) {
+      if (strcmp(line, "") != 0 && strcmp(line, "\n") != 0) {
+        line[strlen(line) - 1] = '\0';
+        std::string imagename = foldername + "/" + line;
+        if (access(imagename.c_str(), F_OK) == 0) {
+          sscanf(line, "L%dR%dU%dD%d.bmp", &left, &right, &up, &down);
+          Grid *grid = new Grid(left, right, up, down);
+          grid->cv_image = imread(imagename);
+          grid->image_converted = true;
+          arma::cube image = cvt_opencv2arma(grid->cv_image);
+          grid->map = image.slice(0) / 255.0;
+          grid->env = this;
+          this->grids.push_back(grid);
+        }
+      }
+      free(line);
+      line = NULL;
     }
-    this->up->set(x, y, p);
-  } else if (y < this->down_range) {
-    if (!this->down) {
-      this->down = new gridmap(
-          this->left_range,
-          this->right_range,
-          this->down_range - height,
-          this->up_range - height);
-      this->down->up = this;
-    }
-    this->down->set(x, y, p);
-  } else {
-    int x_coord = x - this->left_range;
-    int y_coord = height - (y - this->down_range) - 1;
-    this->data.at<Vec3b>(y_coord, x_coord) = Vec3b(p, p, p);
   }
 }
 
-int gridmap::get(int x, int y) {
-  if (x < this->left_range)
-    return this->left ? this->left->get(x, y) : -1;
-  else if (x >= this->right_range)
-    return this->right ? this->right->get(x, y) : -1;
-  else if (y >= this->up_range)
-    return this->up ? this->up->get(x, y) : -1;
-  else if (y < this->down_range)
-    return this->down ? this->down->get(x, y) : -1;
-  else
-    return this->data.at<Vec3b>(y, x)[0];
-}
-
-void gridmap::dumpToFolder(string foldername) {
+void GridMap::store(const std::string &foldername) {
+  // delete the current existing directory
   DIR *dp;
-  struct dirent *entry;
-  char command[256];
-  if ((dp = opendir(foldername.c_str())) != NULL) {
-    while ((entry = readdir(dp)) != NULL)
-      if (foldername.compare(string(entry->d_name)) == 0) {
-        sprintf(command, "rm -rf %s", foldername.c_str());
-        system(command);
-        break;
-      }
+  if ((dp = opendir(foldername.c_str()))) {
     closedir(dp);
+    system(("rm -rf " + foldername).c_str());
   }
-  sprintf(command, "mkdir %s", foldername.c_str());
-  system(command);
-  clearVisit();
-  dumpVisit(foldername);
+  // create a new directory and info file
+  mkdir(foldername.c_str(), 0755);
+  std::string infoname = foldername + "/info.txt";
+  char imagebuf[256];
+  FILE *infofile = fopen(infoname.c_str(), "w");
+  // store the images
+  for (int i = 0; i < this->grids.length; i++) {
+    Grid *grid = this->grids[i];
+    int n_rows = grid->map.n_rows;
+    int n_cols = grid->map.n_cols;
+    arma::cube image = arma::cube(n_rows, n_cols, 1);
+    image.slice(0) = grid->map * 255.0;
+    if (!grid->image_converted) {
+      grid->cv_image = cvt_arma2opencv(image);
+      grid->image_converted = true;
+    }
+    sprintf(imagebuf, "L%dR%dU%dD%d.bmp",
+        grid->left, grid->right, grid->up, grid->down);
+    imwrite(foldername + "/" + imagebuf, grid->cv_image);
+    fprintf(infofile, "%s\n", imagebuf);
+  }
 }
 
-void gridmap::clearVisit() {
-  if (this->visited) {
-    this->visited = false;
-    this->left->clearVisit();
-    this->right->clearVisit();
-    this->up->clearVisit();
-    this->down->clearVisit();
+void GridMap::disp(int row, int col, double radius) {
+  // create a window name: GridMap {row}x{col} [{radius}]
+  char buffer[256];
+  sprintf(buffer, " %dx%d [%lf]", row, col, radius);
+  std::string window_name = "GridMap " + buffer;
+  // create a map
+  int r = (int)ceil(radius);
+  int size = r * 2 + 1;
+  arma::mat map = zeros<mat>(size, size);
+  for (int i = row - r; i <= row + r; i++) {
+    for (int j = col - r; j <= col + r; j++) {
+      map(i, j) = (*this)(i, j);
+    }
   }
+  // display the map using an image
+  arma::cube image = arma::cube(size, size, 1);
+  image.slice(0) = zeros<mat>(size, size);
+  image.slice(1) = map;
+  image.slice(2) = map;
+  disp_image(window_name, image);
 }
 
-void gridmap::dumpVisit(string foldername) {
-  char filename[256];
-  if (!this->visited) {
-    this->visited = true;
-    sprintf(filename, "%s/L%dR%dU%dD%d.bmp",
-        foldername.c_str(),
-        this->left_range,
-        this->right_range,
-        this->up_range,
-        this->down_range);
-    imwrite(filename, this->data);
-    if (this->left) {
-      this->left->dumpVisit(foldername);
-    }
-    if (this->right) {
-      this->right->dumpVisit(foldername);
-    }
-    if (this->up) {
-      this->up->dumpVisit(foldername);
-    }
-    if (this->down) {
-      this->down->dumpVisit(foldername);
-    }
+static int limit(int x, int a, int b) {
+  if (x < a) {
+    return a;
+  } else if (x > b) {
+    return b;
+  } else {
+    return x;
   }
 }

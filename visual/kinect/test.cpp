@@ -7,12 +7,12 @@ using namespace cv;
 using namespace std;
 static char stopsig;
 
-void fuckthekinect(int signum) {
+void stopkinect(int signum) {
   stopsig = 1;
 }
 
 int main(int argc, char ** argv) {
-  signal(SIGINT, fuckthekinect);
+  signal(SIGINT, stopkinect);
 
   Mat depth(Size(640, 480), sizeof(double));
   // initialize

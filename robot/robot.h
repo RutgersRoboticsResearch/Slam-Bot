@@ -1,11 +1,12 @@
-#ifndef robot_h
-#define robot_h
+#ifndef __SB_ROBOT_H__
+#define __SB_ROBOT_H__
 
-#include <stdint.h>
+#include <cstdint>
 #include "coord.h"
 #define NO_ROBOT            0x00000000
 #define STANDARD_OUT        0x00000001
 #define TENNIS_BALL_ROBOT   0x00000002
+#define TACHIKOMA           0x00000003
 
 namespace robot {
   // Note: You can only control 1 robot at a time.

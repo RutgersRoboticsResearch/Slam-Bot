@@ -1,5 +1,5 @@
-#ifndef httplink_h
-#define httplink_h
+#ifndef __SB_HTTPLINK_H__
+#define __SB_HTTPLINK_H__
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,6 +1,7 @@
 #ifndef __SB_KINECT_H__
 #define __SB_KINECT_H__
 
+#include <cstdint>
 #include <vector>
 #include <pthread.h>
 #include <libfreenect.hpp>
@@ -33,6 +34,18 @@ class KinectDevice : public Freenect::FreenectDevice {
     cv::Mat getDepth(void);
     cv::Mat getVideo(void);
     arma::mat getDistance(void);
+};
+
+class Kinect {
+  private:
+    Freenect::Freenect f;
+    void *device;
+    bool is_open;
+
+  public:
+    Kinect(void);
+    bool open(void);
+    bool isOpened(void);
 };
 
 #endif

@@ -1,32 +1,46 @@
-#ifndef gridmap_h
-#define gridmap_h
+#ifndef __SB_GRIDMAP_H__
+#define __SB_GRIDMAP_H__
 
 #include <string>
+#include <vector>
+#include <armadillo>
 #include <opencv2/core/core.hpp>
 
-class gridmap {
+class Grid {
   public:
-    gridmap(int min_x = 0,
-                int max_x = 100,
-                int min_y = 0,
-                int max_y = 100);
-    ~gridmap();
-    void set(int x, int y, int p);
-    int get(int x, int y);
-    void dumpToFolder(std::string foldername);
-    cv::Mat data;
+    arma::mat map;
+    int left;
+    int right;
+    int up;
+    int down;
+    cv::Mat cv_image;
+    bool image_converted;
+    GridMap *env;
+
+    Grid(void);
+    Grid(int blocksize);
+    Grid(int left, int right, int up, int down);
+    ~Grid(void);
+    bool inRange(const int row, const int col);
+
   private:
-    gridmap *left;
-    gridmap *right;
-    gridmap *up;
-    gridmap *down;
-    int left_range;
-    int right_range;
-    int up_range;
-    int down_range;
-    bool visited;
-    void clearVisit();
-    void dumpVisit(std::string foldername);
+    void init(int left, int right, int up, int down);
+};
+
+class GridMap {
+  public:
+    GridMap(void):
+    GridMap(int blocksize);
+    ~GridMap();
+    double &operator()(const int row, const int col);
+    void load(const std::string &foldername);
+    void store(const std::string &foldername);
+    void disp(int row, int col, double radius);
+
+  private:
+    int n_rows;
+    int n_cols;
+    std::vector<Grid *> grids;
 };
 
 #endif

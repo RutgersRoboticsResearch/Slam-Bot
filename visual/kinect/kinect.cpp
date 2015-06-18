@@ -1,9 +1,11 @@
-#include <math.h>
-#include <stdio.h>
+#include <cmath>
+#include <cstdio>
 #include "kinect.h"
 
 using namespace cv;
 using namespace std;
+
+static int kinectCount;
 
 /* This file accesses the Kinect Device and gets its video and depth frames. If a depth frame is deteced, a new distance frame is created as well */
 
@@ -16,15 +18,13 @@ KinectDevice::KinectDevice(freenect_context *_ctx, int _index) :
     new_video_frame(false),
     depthMat(Size(640, 480), CV_16UC1),
     videoMat(Size(640, 480), CV_8UC3),
-    new_bgr_frame(false),
-    new_meters_frame(false),
-    raw2bgrMat(Size(640, 480), CV_8UC3),
-    distanceMat(Size(640, 480), sizeof(double)) {
+    new_distance_frame(false),
+    distanceMat(640, 480, arma::fill::zeros) {
   int i;
   for (i = 0; i < 2048; i++) {
     float v = i / 2048.0;
     v = pow(v, 3) * 6;
-    gamma_buffer[i] = v * 6 * 256;
+    this->gamma_buffer[i] = v * 6 * 256;
   }
   pthread_mutex_init(&depth_lock, NULL);
   pthread_mutex_init(&video_lock, NULL);
@@ -78,18 +78,16 @@ bool KinectDevice::getVideo(Mat& output) {
   }
 }
 
-uint16_t sigfun(double x) {
-  return (uint16_t)(x * 150.0);
-}
-
-bool KinectDevice::getDistanceMat(void) {
+arma::mat KinectDevice::getDistanceMat(void) {
   if (new_depth_frame) {
     getDepth(depthMat);
   }
   if (new_meters_frame) {
-    for (int y = 0; y < depthMat.rows; y++)
-      for (int x = 0; x < depthMat.cols; x++)
+    for (int y = 0; y < depthMat.rows; y++) {
+      for (int x = 0; x < depthMat.cols; x++) {
         distanceMat(y, x) = raw2meters(depthMat.at<uint16_t>(y, x));
+      }
+    }
     distanceMat.copyTo(output);
     new_meters_frame = false;
     return true;
@@ -102,4 +100,21 @@ bool KinectDevice::getDistanceMat(void) {
 double KinectDevice::raw2meters(uint16_t raw) {
   // stephane maganate
   return (0.1236 * tan((double)raw / 2842.5 + 1.1863));
+}
+
+Kinect::Kinect(void) {
+  this->device = NULL;
+  this->is_open = false;
+}
+
+bool Kinect::open(void) {
+  KinectDevice &kinect = f.createDevice<KinectDevice>(kinectCount);
+  kinectCount++;
+  this->device = (void *)&kinect;
+  this->is_open = true;
+  return true;
+}
+
+bool Kinect::isOpened(void) {
+  return this->is_open;
 }

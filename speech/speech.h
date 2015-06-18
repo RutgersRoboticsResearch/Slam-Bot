@@ -1,5 +1,5 @@
-#ifndef speech_h
-#define speech_h
+#ifndef __SB_SPEECH_H__
+#define __SB_SPEECH_H__
 
 namespace speech {
   int start(void);

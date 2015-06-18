@@ -1,5 +1,5 @@
-#ifndef __CONSTRUCT_H__
-#define __CONSTRUCT_H__
+#ifndef __SB_CONSTRUCT_H__
+#define __SB_CONSTRUCT_H__
 
 #include <armadillo>                // for the transformation matrices
 

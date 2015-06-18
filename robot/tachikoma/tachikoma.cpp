@@ -9,24 +9,36 @@
  *
  ***************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <cmath>
 #include <unistd.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include <termios.h>
-#include <time.h>
-#include <math.h>
 #include <vector>
 #include "tachikoma.h"
 #include "measurements.h"
 
-#define DEV_BAUD      B38400
-#define SYNC_NSEC     100000000
-#define ENCODER_WAIST 0
-#define ENCODER_THIGH 1
-#define ENCODER_SHIN  2
+#define NUM_DEV         8
+#define NUM_LEGS        4
+#define NUM_ARMS        4
+#define DEV_BAUD        B115200
+#define NW_LEG_DEVID    1
+#define NE_LEG_DEVID    2
+#define SW_LEG_DEVID    3
+#define SE_LEG_DEVID    4
+#define NW_WHEEL_DEVID  5
+#define NE_WHEEL_DEVID  6
+#define SW_WHEEL_DEVID  7
+#define SE_WHEEL_DEVID  8
+#define ENCODER_WAIST   0
+#define ENCODER_THIGH   1
+#define ENCODER_SHIN    2
+#define SYNC_NSEC       100000000
+#define WBUFSIZE        128
 
 static int limit(int value, int min_value, int max_value);
 static double limitf(double value, double min_value, double max_value);
@@ -44,159 +56,147 @@ static arma::vec linear_motion(const arma::vec &start, const arma::vec &stop, do
 
 /** Constructor
  */
-tachikoma::tachikoma(void) {
+Tachikoma::Tachikoma(void) {
   this->connect();
 }
 
 /** Deconstructor
  */
-tachikoma::~tachikoma(void) {
+Tachikoma::~Tachikoma(void) {
   this->disconnect();
 }
 
-/** Initialize the communication layer.
- *  @return whether or not the robot was able to connect with a device
+/** Initialize the communication layer
+ *  @return whether or not the robot has connected.
  */
-bool tachikoma::connect(void) {
+bool Tachikoma::connect(void) {
   // find all the arduino devices in the device directory
-  DIR *device_dir;
+  DIR *device_dir = opendir("/dev/");
   struct dirent *entry;
-  int i, n;
-  device_dir = opendir("/dev/"); // device directory
-  // iterate through all the possible filenames in the directory, get count
+  // iterate through all the filenames in the directory,
+  // add all the possible connections to the list
   this->num_possible = 0;
   while ((entry = readdir(device_dir))) {
     if (strcmp(entry->d_name, ".") != 0 &&
         strcmp(entry->d_name, "..") != 0 &&
         strstr(entry->d_name, "ttyACM")) {
-      this->num_possible++;
-    }
-  }
-  closedir(device_dir);
-  if (this->num_possible == 0) {
-    this->disconnect();
-    return false;
-  }
-  this->possible_ports = new char *[this->num_possible];
-  device_dir = opendir("/dev/");
-  i = 0;
-  // add all the possible filenames to the list
-  while ((entry = readdir(device_dir))) {
-    if (strcmp(entry->d_name, ".") != 0 &&
-        strcmp(entry->d_name, "..") != 0 &&
-        strstr(entry->d_name, "ttyACM")) {
-      char *pport;
-      pport = new char[strlen("/dev/") + strlen(entry->d_name) + 1];
+      char *pport = new char[strlen("/dev/") + strlen(entry->d_name) + 1];
       sprintf(pport, "/dev/%s", entry->d_name);
-      this->possible_ports[i++] = pport;
+      this->pports.push_back(pport);
     }
   }
   closedir(device_dir);
+  if (this->pports.size() == 0) {
+    this->disconnect();
+    return -1;
+  }
+
   // when finished adding all the possible filenames,
-  // try to connect to a couple of them (TACHI_NUM_DEV)
+  // try to connect to a couple of them (NUM_DEV)
   // and identify their ids
-  this->connections = new serial_t[TACHI_NUM_DEV];
-  memset(this->connections, 0, sizeof(serial_t) * TACHI_NUM_DEV);
-  this->ids = new int[TACHI_NUM_DEV];
-  for (i = 0, n = 0; n < TACHI_NUM_DEV && i < this->num_possible; i++) {
-    char *msg;
-    int id;
-    struct timespec synctime;
-    synctime.tv_nsec = SYNC_NSEC % 1000000000;
-    synctime.tv_sec = SYNC_NSEC / 1000000000;
+  struct timespec synctime;
+  synctime.tv_nsec = SYNC_NSEC % 1000000000;
+  synctime.tv_sec = SYNC_NSEC / 1000000000;
+  for (int i = 0; this->connections.size() < NUM_DEV && i < this->pports.size(); i++) {
     // connect device
-    serial_connect(&this->connections[n], this->possible_ports[i], DEV_BAUD);
-    if (!this->connections[n].connected) {
+    serial_t *connection = new serial_t;
+    serial_connect(connection, this->pports[i], DEV_BAUD);
+    if (!connection->connected) {
       continue;
     }
     // read a message
+    char *msg;
     nanosleep(&synctime, NULL);
     do  {
-      msg = serial_read(&this->connections[n]);
+      msg = serial_read(connection);
     } while (!msg || strlen(msg) == 0);
     // read another one in case that one was garbage
     nanosleep(&synctime, NULL);
     do {
-      msg = serial_read(&this->connections[n]);
+      msg = serial_read(connection);
     } while (!msg || strlen(msg) == 0);
+    // debug
+    printf("Message: %s\n", msg);
     // if a valid device, add as connected, otherwise disconnect
+    int id;
     sscanf(msg, "[%d ", &id);
-    if (id == TACHI_NW_LEG_DEVID ||
-        id == TACHI_NE_LEG_DEVID ||
-        id == TACHI_SW_LEG_DEVID ||
-        id == TACHI_SE_LEG_DEVID ||
-        id == TACHI_NW_WHEEL_DEVID ||
-        id == TACHI_NE_WHEEL_DEVID ||
-        id == TACHI_SW_WHEEL_DEVID ||
-        id == TACHI_SE_WHEEL_DEVID) {
-      printf("Identified [%s] as [%d]\n", this->possible_ports[i], id);
-      this->ids[n++] = id;
+    if (id == NW_LEG_DEVID ||
+        id == NE_LEG_DEVID ||
+        id == SW_LEG_DEVID ||
+        id == SE_LEG_DEVID ||
+        id == NW_WHEEL_DEVID ||
+        id == NE_WHEEL_DEVID ||
+        id == SW_WHEEL_DEVID ||
+        id == SE_WHEEL_DEVID) {
+      this->connections.push_back(connection);
+      this->ids.push_back(id);
     } else {
-      serial_disconnect(&this->connections[n]);
+      serial_disconnect(connection);
     }
   }
 
-  this->num_connected = n;
-  if (n == 0) {
+  // initialize the initial run data
+  this->prev_legval = mat(4, NUM_LEGS);
+  this->leg_const = ones<mat>(4, NUM_LEGS) * 255.0;
+  this->prev_armval = mat(1, NUM_ARMS);
+  this->arm_const = ones<mat>(1, NUM_ARMS) * 255.0;
+
+  // debug
+  printf("number of devices connected: %d\n", n);
+  // disconnect if number of devices is not enough, or there are too many
+  if (this->connections.size() == 0) {
     this->disconnect();
     return false;
   } else {
     // reset
-    // this->init_state_space(); // only needed for walking
     this->reset();
-    this->update(this->base[0], this->base[1], this->arm[0], this->arm[1]);
+    this->update(zeros<mat>(4, 4));
     return true;
-  }
-}
-
-/** Disconnect everything
- */
-void tachikoma::disconnect(void) {
-  int i;
-  if (this->connected()) {
-    // reset the robot
-    this->reset();
-    this->send();
-    // delete the connections
-    if (this->connections) {
-      for (i = 0; i < this->num_connected; i++) {
-        serial_disconnect(&this->connections[i]);
-      }
-      delete this->connections;
-      this->connections = NULL;
-    }
-    // delete the port names
-    if (this->possible_ports) {
-      for (i = 0; i < this->num_possible; i++) {
-        if (this->possible_ports[i]) {
-          delete this->possible_ports[i];
-        }
-      }
-      delete this->possible_ports;
-      this->possible_ports = NULL;
-    }
-    // delete the ids
-    if (this->ids) {
-      delete this->ids;
-      this->ids = NULL;
-    }
-    this->num_possible = 0;
-    this->num_connected = 0;
   }
 }
 
 /** Determine whether or not the robot is connected
  *  @return true if the robot is connected to a device, else false
  */
-bool tachikoma::connected(void) {
-  return this->num_connected > 0;
+bool Tachikoma::connected(void) {
+  return this->connections.size() > 0;
 }
 
-/** Return the number of devices that are connected
- *  @return the number of devices that are connected
+/** Determine the number of devices that are connected
+ *  @return the number of connected devices
  */
-int tachikoma::numconnected(void) {
-  return this->num_connected;
+int Tachikoma::numconnected(void) {
+  return this->connections.size();
+}
+
+/** Disconnect everything
+ */
+void tachikoma::disconnect(void) {
+  // delete the connections
+  if (this->connections.size() > 0) {
+    this->send(zeros<mat>(leg_const.n_rows, leg_const.n_cols),
+               zeros<mat>(arm_const.n_rows, arm_const.n_cols));
+    for (int i = 0; i < this->connections.size(); i++) {
+      serial_disconnect(this->connections[i]);
+      delete this->connections[i];
+    }
+    this->connections.clear();
+    this->ids.clear();
+  }
+  // delete the port names
+  if (this->pports.size() > 0) {
+    for (int i = 0; i < this->pports.size(); i++) {
+      delete this->pports[i];
+    }
+    this->pports.clear();
+  }
+  this->reset();
+}
+
+/** Reset the robot values
+ */
+void Tachikoma::reset(void) {
+  this->prev_legval.zeros();
 }
 
 /** Update the robot's incoming and outgoing signals
@@ -209,19 +209,13 @@ int tachikoma::numconnected(void) {
  *  @param rightarm
  *    the pose for the right arm
  */
-int tachikoma::update(pose3d_t wheelbase, pose3d_t legbase,
-    pose3d_t leftarm, pose3d_t rightarm) {
-//  int i;
-  memcpy(&this->base[0], &wheelbase, sizeof(pose3d_t));
-  memcpy(&this->base[1], &legbase, sizeof(pose3d_t));
-  memcpy(&this->arm[0], &legbase, sizeof(pose3d_t));
-  memcpy(&this->arm[1], &legbase, sizeof(pose3d_t));
+void Tachikoma::update(const mat &legval, const mat &armval) {
+  // update the observation from the devices
   this->recv();
+  // solve for the current position of the robot
+  this->leg_fk_solve();
 
   // update the legs
-//  for (i = 0; i < TACHI_NUM_LEG_DEV; i++) {
-//    this->leg_fk_solve(i);
-//  }
   this->update_stand();
   this->update_drive();
   // TODO add conversion from target enc to actual
@@ -659,7 +653,6 @@ void tachikoma::leg_ik_solve(int legid, const arma::vec &target) {
 
   this->target_enc[legid] = encoder;
 }
-
 
 /** PRIVATE FUNCTIONS **/
 

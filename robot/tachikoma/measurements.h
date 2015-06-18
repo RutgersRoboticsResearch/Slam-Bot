@@ -1,7 +1,7 @@
-#ifndef measurements_h
-#define measurements_h
+#ifndef __SB_MEASUREMENTS_H__
+#define __SB_MEASUREMENTS_H__
 
-#include <math.h>
+#include <cmath>
 
 // Note: all the following measurements are in cm and radians
 // for length and angle respectively

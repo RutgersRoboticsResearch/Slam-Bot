@@ -6,10 +6,10 @@
  * the front end, as well as the
  * starting program.
  ***********************************/
+#include <cstring>
+#include <cstdio>
+#include <ctime>
 #include <signal.h>
-#include <string.h>
-#include <stdio.h>
-#include <time.h>
 #include "coord.h"
 #include "robot.h"
 #include "user.h"

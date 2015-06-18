@@ -34,5 +34,14 @@ manual: manual.o
 	$(CC) $(CFLAGS) $(INCLUDE) -o $@ $^ $(LIBS)
 
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+	rm -f $(OBJECTS) $(TARGET) *.o dict
 	$(foreach directory, $(SUBDIRS), make clean -C $(directory);)
+
+dict.o: dict.c
+	gcc -g -c $<
+
+test.o: test.c
+	gcc -g -c $<
+
+dict: dict.o test.o
+	gcc -g -o $@ $^

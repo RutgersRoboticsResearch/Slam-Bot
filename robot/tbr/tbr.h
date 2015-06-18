@@ -1,43 +1,31 @@
-#ifndef tbr_h
-#define tbr_h
+#ifndef __SB_TBR_H__
+#define __SB_TBR_H__
 
-#include <stdint.h>
+#include <armadillo>
 #include "serial.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+class TennisBallRobot {
+  private:
+    std::vector<serial_t *> connections;
+    std::vector<int> ids;
+    std::vector<char *> pports;
 
-typedef struct tbr {
-  serial_t *connections;
-  int *ids;
-  int8_t connected;
+    arma::vec prev_motion;
+    arma::vec motion_const;
+    arma::vec sonar;
+    arma::vec pot;
 
-  char **possible_ports;
-  int num_possible;
-
-  double left;
-  double right;
-  double arm;
-  double claw;
-
-  double prev_left;
-  double prev_right;
-  double prev_arm;
-  double prev_claw;
-
-  double sonar[3];
-  int potentiometer;
-} tbr_t;
-
-int tbr_connect(tbr_t *robot);
-void tbr_send(tbr_t *robot);
-void tbr_recv(tbr_t *robot);
-void tbr_disconnect(tbr_t *robot);
-void tbr_reset(tbr_t *robot);
-
-#ifdef __cplusplus
-}
-#endif
+  public:
+    TennisBallRobot(void);
+    ~TennisBallRobot(void);
+    bool connect(void);
+    bool connected(void);
+    int numconnected(void);
+    void disconnect(void);
+    void reset(void);
+    void send(const arma::vec &motion);
+    void recv(void);
+    //dict sense(void);
+};
 
 #endif

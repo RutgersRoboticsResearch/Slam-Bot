@@ -1,40 +1,27 @@
-#ifndef tachikoma_h
-#define tachikoma_h
+#ifndef __SB_TACHIKOMA_H__
+#define __SB_TACHIKOMA_H__
 
 #include <armadillo>
 #include <sys/time.h>
 #include "coord.h"
 #include "serial.h"
 #include "actionstate.h"
+#include "dict.h"
 
-#define TACHI_NUM_DEV         8
-#define TACHI_NUM_LEG_DEV     4
-#define TACHI_NUM_WHEEL_DEV   4
-#define TACHI_NW_LEG_DEVID    1
-#define TACHI_NE_LEG_DEVID    2
-#define TACHI_SW_LEG_DEVID    3
-#define TACHI_SE_LEG_DEVID    4
-#define TACHI_NW_WHEEL_DEVID  5
-#define TACHI_NE_WHEEL_DEVID  6
-#define TACHI_SW_WHEEL_DEVID  7
-#define TACHI_SE_WHEEL_DEVID  8
-
-class tachikoma {
+class Tachikoma {
   private:
-    serial_t *connections;
-    int *ids;
-    char **possible_ports;
-    int num_possible;
-    int num_connected;
+    std::vector<serial_t *> connections;
+    std::vector<int> ids;
+    std::vector<char *> possible_ports;
 
-    arma::vec curr_pos[TACHI_NUM_LEG_DEV];
-    arma::vec curr_enc[TACHI_NUM_LEG_DEV];
-    arma::vec target_pos[TACHI_NUM_LEG_DEV];
-    arma::vec target_enc[TACHI_NUM_LEG_DEV];
-    int legval[TACHI_NUM_LEG_DEV][3];
-    int plegval[TACHI_NUM_LEG_DEV][3];
-    int wheelval[TACHI_NUM_WHEEL_DEV][1];
-    int pwheelval[TACHI_NUM_WHEEL_DEV][1];
+    arma::mat curr_pos;
+    arma::mat curr_enc;
+    arma::mat target_pos;
+    arma::mat target_enc;
+
+    arma::mat prev_legval;
+    arma::mat leg_const;
+    arma::mat prev_armval;
 
     // Action State stuff
     int overall_state;
@@ -46,10 +33,7 @@ class tachikoma {
     void init_state_space(void);
     void send(void);
     void recv(void);
-    void update_walk(double forward,
-                        double backward,
-                        double turn_left,
-                        double turn_right);
+    void update_walk(const arma::vec &walkvec);
     void update_stand(void);
     void update_drive(void);
     void leg_fk_solve(int legid);
@@ -59,45 +43,13 @@ class tachikoma {
     pose3d_t base[2];
     pose3d_t arm[2];
 
-    /** Constructor
-     */
-    tachikoma(void);
-
-    /** Deconstructor
-     */
-    ~tachikoma(void);
-
-    /** Initialize the communication layer.
-     *  @return whether or not the robot was able to connect with a device
-     */
+    Tachikoma(void);
+    ~Tachikoma(void);
     bool connect(void);
-
-    /** Disconnect everything
-     */
-    void disconnect(void);
-
-    /** Determine whether or not the robot is connected
-     *  @return true if the robot is connected to a device, else false
-     */
     bool connected(void);
-
-    /** Return the number of devices that are connected
-     *  @return the number of devices that are connected
-     */
     int numconnected(void);
-
-    /** Update the robot's incoming and outgoing signals
-     *  @param wheelbase
-     *    the pose for the wheels
-     *  @param legbase
-     *    the pose for the legs and waist
-     *  @param leftarm
-     *    the pose for the left arm
-     *  @param rightarm
-     *    the pose for the right arm
-     */
-    int update(pose3d_t wheelbase, pose3d_t legbase,
-               pose3d_t leftclaw, pose3d_t rightclaw);
+    void disconnect(void);
+    void update(const vec &motion);
 
     /** Observe the current world
      *  @return NULL for now

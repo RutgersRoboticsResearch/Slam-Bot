@@ -1,5 +1,5 @@
-#ifndef actionstate_h
-#define actionstate_h
+#ifndef __SB_ACTIONSTATE_H__
+#define __SB_ACTIONSTATE_H__
 
 #include <armadillo>
 

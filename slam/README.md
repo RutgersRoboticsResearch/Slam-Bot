@@ -1,14 +1,16 @@
 About this package
 ==================
 
-Note that this is an optional (C++) package!
-
-That means that it is not necessary to include into the main decision engine
-which will be created by Edward Choi.
-
-Thanks and good luck using it!
-
---Timothy Yong
-
 TODO:
-- convert the package to use a custom matrix library which can do gpu processing
+<ol>
+  <lI>get this running on the GPU</li>
+</ol>
+
+DEPS:
+<ol>
+  <li>c++</li>
+  <li>make toolchain</li>
+  <li>armadillo</li>
+  <li>rplidar driver</li>
+  <li>cuda</li>
+</ol>

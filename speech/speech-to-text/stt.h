@@ -1,5 +1,5 @@
-#ifndef stt_h
-#define stt_h
+#ifndef __SB_STT_H__
+#define __SB_STT_H__
 
 #ifdef __cplusplus
 extern "C" {

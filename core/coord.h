@@ -1,5 +1,5 @@
-#ifndef coord_h
-#define coord_h
+#ifndef __SB_COORD_H__
+#define __SB_COORD_H__
 
 typedef struct pose3d {
   double x;

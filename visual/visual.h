@@ -1,22 +1,25 @@
-#ifndef visual_h
-#define visual_h
+#ifndef __SB_VISUAL_H__
+#define __SB_VISUAL_H__
 
-#include "coord.h"
+#include <armadillo>
 
-#define DETECT_BALL 12
-#define DETECT_BASKET 13
+namespace visual {
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+  /** Initialize the visual space,
+   *  such as the camera and/or other depth sensors.
+   */
+  void init(void);
 
-int start_visual(void);
-void set_detection(int mode);
-pose3d_t *get_position(int *found, int *type, int *readdata);
-int stop_visual(void);
+  /** Check to see if the camera has been initialized
+   *  @return true if a camera was found, else false
+   */
+  bool hasCamera(void);
 
-#ifdef __cplusplus
+  /** Get the type of the camera
+   * 
+   */
+  bool hasDepth(void);
+  
 }
-#endif
 
 #endif

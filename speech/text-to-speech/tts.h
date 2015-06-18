@@ -1,5 +1,5 @@
-#ifndef tts_h
-#define tts_h
+#ifndef __SB_TTS_H__
+#define __SB_TTS_H__
 
 #ifdef __cplusplus
 extern "C" {
