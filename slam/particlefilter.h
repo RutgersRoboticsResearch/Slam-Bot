@@ -42,11 +42,12 @@ class ParticleFilter {
 
   private:
     int particle_count;
+    
     std::vector<Particle> particles;
     std::vector<arma::vec> latestobs;
     struct timeval obstimestamp;
     
-    void weight(Particle p);
+    void weight(const Particle &p);
     void resample(void);
 };
 

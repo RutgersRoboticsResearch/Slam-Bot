@@ -12,7 +12,9 @@ const double var_angle = 0.0;
 static double gauss(double x, double mu, double sigma);
 static double mag(arma::vec &v);
 
-ParticleFilter::ParticleFilter(gridmap &map, int nparticles) {
+static GridMap map;
+
+ParticleFilter::ParticleFilter(GridMap &map, int nparticles) {
   // set up the randomness
   struct timeval t;
   gettimeofday(&t, NULL);
@@ -20,26 +22,25 @@ ParticleFilter::ParticleFilter(gridmap &map, int nparticles) {
       (unsigned int)getpid());
   // create a new vector of particles
   this->particle_count = nparticles;
-  // add particles to the particle list
   for (int i = 0; i < nparticles; i++) {
-    this->particles[i].pose  = arma::vec({
+    this->particles.push_back(Particle(
         (double)(rand() % map->cols),
         (double)(rand() % map->rows),
-        ((double)rand() / (double)RAND_MAX) * M_2_PI
-    });
-    this->particles[i].life = 1.0 / nparticles;
+        ((double)rand() / (double)RAND_MAX) * M_2_PI,
+        1.0));
   }
 }
 
 ParticleFilter::~ParticleFilter(void) {
-  delete this->particles;
+  this->particles.clear();
+  this->latestobs.clear();
 }
 
-void ParticleFilter::update(arma::vec &motion, std::vector<arma::vec> &obs) {
+void ParticleFilter::update(const arma::vec &motion, const std::vector<arma::vec> &obs) {
   // record the observation
   this->latestobs = obs;
   gettimeofday(&this->obstimestamp, NULL);
-  // update the particle based on motion and obseration
+  // update the particle based on motion and observation
   for (int i = 0; i < this->particle_count; i++) {
     this->particles[i].pose += motion;
     this->particles[i].life = this->weight(this->particles[i]);
@@ -47,7 +48,20 @@ void ParticleFilter::update(arma::vec &motion, std::vector<arma::vec> &obs) {
   this->resample();
 }
 
-void ParticleFilter::weight(particle_t p) {
+std::vector<arma::vec> ParticleFilter::get_landmarks(arma::vec position) {
+  arma::mat field = map.grab_field(position(0), position(1), 50.0);
+  std::vector<arma::vec> positions;
+  for (int i = 0; i < field.n_rows; i++) {
+    for (int j = 0; j < field.n_cols; j++) {
+      if (field(i, j) > 0.5) {
+        positions += arma::vec({i, j});
+      }
+    }
+  }
+  return positions;
+}
+
+double ParticleFilter::weight(const Particle &p) {
   // get a sample of the world around the particle
   std::vector<arma::vec> landmarks = this->get_landmarks(p.pose);
   std::vector<arma::vec> matched = std::vector<arma::vec>(landmarks.size());
@@ -78,14 +92,6 @@ void ParticleFilter::weight(particle_t p) {
   return importance;
 }
 
-std::vector<arma::vec> ParticleFilter::get_landmarks(arma::vec pose, int nlandmarks) {
-  /* knn of 1? */
-  std::vector<arma::vec> landmarks(1000);
-  for (int i = 0; i < nlandmarks; i++) {
-    landmarks[i] = 
-  }
-}
-
 void ParticleFilter::resample(void) {
   // normalize all the lives of the particles
   double max_weight = 0.0;
@@ -103,16 +109,15 @@ void ParticleFilter::resample(void) {
   // start the resampling using the resampling wheel
   double index = rand() % this->particle_count; // fast uniform sample
   double beta = 0.0;
-  particle_t *new_particles = new particle_t[this->particle_count];
+  std::vector<Particles> new_particles;
   for (int i = 0; i < this->particle_count; i++) {
     beta += ((double)rand() / (double)RAND_MAX) * 2.0 * max_weight;
     while (this->particles[index].life < beta) {
       beta -= this->particles[index].life;
       index = (index + 1) % this->particle_count;
     }
-    new_particles[i] = this->particles[index];
+    new_particles.push_back(this->particles[index]);
   }
-  delete(this->particles);
   this->particles = new_particles;
 }
 

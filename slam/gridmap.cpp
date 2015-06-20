@@ -140,7 +140,7 @@ void GridMap::load(const std::string &foldername) {
   std::string infoname = foldername + "/info.txt";
   FILE *fp;
   if ((fp = fopen(infoname.c_str(), "r"))) {
-    char *line = NULL;
+    char *line;
     size_t n;
     int left;
     int right;
@@ -217,6 +217,12 @@ void GridMap::disp(int row, int col, double radius) {
   image.slice(1) = map;
   image.slice(2) = map;
   disp_image(window_name, image);
+}
+
+void GridMap::getPortion(int row, int col, double radius) {
+  int r = (int)ceil(radius);
+  int size = r * 2 + 1;
+  arma::mat map
 }
 
 static int limit(int x, int a, int b) {

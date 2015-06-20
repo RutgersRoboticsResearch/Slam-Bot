@@ -36,6 +36,7 @@ class GridMap {
     void load(const std::string &foldername);
     void store(const std::string &foldername);
     void disp(int row, int col, double radius);
+    arma::mat grab_field(int row, int col, double radius);
 
   private:
     int n_rows;
