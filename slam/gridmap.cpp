@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <cstdio>
 #include <cmath>
@@ -7,17 +8,18 @@
 #include "gridmap.h"
 
 #define MAX_MAPS 64
+#define STD_GRIDSIZE 128
 
 static int nmaps;
 static double dummyval;
 static int limit(int x, int a, int b);
 
 Grid::Grid(void) {
-  this->init(0, 0, 64, 64);
+  this->init(0, 0, STD_GRIDSIZE, STD_GRIDSIZE);
 }
 
-Grid::Grid(int blocksize) {
-  this->init(0, 0, blocksize, blocksize);
+Grid::Grid(int gridsize) {
+  this->init(0, 0, gridsize, gridsize);
 }
 
 Grid::Grid(int left, int right, int up, int down) {
@@ -43,13 +45,13 @@ void Grid::init(int left, int right, int up, int down) {
 }
 
 GridMap::GridMap(void) {
-  this->n_rows = 128;
-  this->n_cols = 128;
+  this->n_rows = STD_GRIDSIZE;
+  this->n_cols = STD_GRIDSIZE;
 }
 
-GridMap::GridMap(int blocksize) {
-  this->n_rows = blocksize;
-  this->n_cols = blocksize;
+GridMap::GridMap(int gridsize) {
+  this->n_rows = gridsize;
+  this->n_cols = gridsize;
 }
 
 GridMap::~GridMap() {
@@ -67,7 +69,7 @@ double &GridMap::operator()(const int row, const int col) {
   // try to find the grid item by using binary search
   while (beg != end) {
     if (beg + 1 == end) {
-      if (this->grids[beg]->inRange(row, col) {
+      if (this->grids[beg]->inRange(row, col)) {
         grid = this->grids[beg];
       } else if (this->grids[end]->inRange(row, col)) {
         grid = this->grids[end];
@@ -100,7 +102,7 @@ double &GridMap::operator()(const int row, const int col) {
         rtrunc * this->n_rows,
         utrunc * this->n_cols,
         dtrunc * this->n_cols);
-    grid->env = this;
+    grid->env = (void *)this;
     // insert the grid item
     if (this->grids.size() == 0) {
       this->grids.push_back(grid);
@@ -153,11 +155,11 @@ void GridMap::load(const std::string &foldername) {
         if (access(imagename.c_str(), F_OK) == 0) {
           sscanf(line, "L%dR%dU%dD%d.bmp", &left, &right, &up, &down);
           Grid *grid = new Grid(left, right, up, down);
-          grid->cv_image = imread(imagename);
+          grid->cv_image = cv::imread(imagename, CV_LOAD_IMAGE_COLOR);
           grid->image_converted = true;
           arma::cube image = cvt_opencv2arma(grid->cv_image);
           grid->map = image.slice(0) / 255.0;
-          grid->env = this;
+          grid->env = (void *)this;
           this->grids.push_back(grid);
         }
       }
@@ -180,7 +182,7 @@ void GridMap::store(const std::string &foldername) {
   char imagebuf[256];
   FILE *infofile = fopen(infoname.c_str(), "w");
   // store the images
-  for (int i = 0; i < this->grids.length; i++) {
+  for (int i = 0; i < this->grids.size(); i++) {
     Grid *grid = this->grids[i];
     int n_rows = grid->map.n_rows;
     int n_cols = grid->map.n_cols;
@@ -199,30 +201,28 @@ void GridMap::store(const std::string &foldername) {
 
 void GridMap::disp(int row, int col, double radius) {
   // create a window name: GridMap {row}x{col} [{radius}]
-  char buffer[256];
-  sprintf(buffer, " %dx%d [%lf]", row, col, radius);
-  std::string window_name = "GridMap " + buffer;
+  char window_name[256];
+  sprintf(window_name, "GridMap %dx%d [%lf]", row, col, radius);
   // create a map
-  int r = (int)ceil(radius);
-  int size = r * 2 + 1;
-  arma::mat map = zeros<mat>(size, size);
-  for (int i = row - r; i <= row + r; i++) {
-    for (int j = col - r; j <= col + r; j++) {
-      map(i, j) = (*this)(i, j);
-    }
-  }
+  arma::mat map = this->getPortion(row, col, radius);
   // display the map using an image
-  arma::cube image = arma::cube(size, size, 1);
-  image.slice(0) = zeros<mat>(size, size);
+  arma::cube image = arma::cube(radius, radius, 1);
+  image.slice(0) = arma::zeros<arma::mat>(radius, radius);
   image.slice(1) = map;
   image.slice(2) = map;
   disp_image(window_name, image);
 }
 
-void GridMap::getPortion(int row, int col, double radius) {
-  int r = (int)ceil(radius);
-  int size = r * 2 + 1;
-  arma::mat map
+arma::mat GridMap::getPortion(int row, int col, double radius) {
+  int d = (int)ceil(radius);
+  int size = d * 2 + 1;
+  arma::mat map = arma::zeros<arma::mat>(radius, radius);
+  for (int i = row - d; i <= row + d; i++) {
+    for (int j = col - d; j <= col + d; j++) {
+      map(i, j) = (*this)(i, j);
+    }
+  }
+  return map;
 }
 
 static int limit(int x, int a, int b) {

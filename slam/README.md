@@ -3,7 +3,7 @@ About this package
 
 TODO:
 <ol>
-  <lI>get this running on the GPU</li>
+  <li>get this running on the GPU</li>
 </ol>
 
 DEPS:
@@ -13,4 +13,7 @@ DEPS:
   <li>armadillo</li>
   <li>rplidar driver</li>
   <li>cuda</li>
+  <li>libglew-dev</li>
+  <li>libglm-dev</li>
+  <li>libsdl2-dev</li>
 </ol>

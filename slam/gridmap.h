@@ -8,6 +8,12 @@
 
 class Grid {
   public:
+    Grid(void);
+    Grid(int gridsize);
+    Grid(int left, int right, int up, int down);
+    ~Grid(void);
+    bool inRange(const int row, const int col);
+
     arma::mat map;
     int left;
     int right;
@@ -15,13 +21,7 @@ class Grid {
     int down;
     cv::Mat cv_image;
     bool image_converted;
-    GridMap *env;
-
-    Grid(void);
-    Grid(int blocksize);
-    Grid(int left, int right, int up, int down);
-    ~Grid(void);
-    bool inRange(const int row, const int col);
+    void *env;
 
   private:
     void init(int left, int right, int up, int down);
@@ -29,14 +29,14 @@ class Grid {
 
 class GridMap {
   public:
-    GridMap(void):
-    GridMap(int blocksize);
+    GridMap(void);
+    GridMap(int gridsize);
     ~GridMap();
     double &operator()(const int row, const int col);
     void load(const std::string &foldername);
     void store(const std::string &foldername);
     void disp(int row, int col, double radius);
-    arma::mat grab_field(int row, int col, double radius);
+    arma::mat getPortion(int row, int col, double radius);
 
   private:
     int n_rows;
