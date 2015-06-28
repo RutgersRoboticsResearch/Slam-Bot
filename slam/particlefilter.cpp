@@ -32,8 +32,8 @@ ParticleFilter::ParticleFilter(GridMap &map, int nparticles) : world(map)
   // create a new vector of particles 
   for ( int i = 0; i < nparticles; i++ ) {
     this->particles.push_back(
-	Particle( ( double )( rand() % map.cols )
-	,         ( double )( rand() % map.rows )
+	Particle( ( double )( rand() % 128 )
+	,         ( double )( rand() % 128 )
 	,	  ( UniformPDF() * M_2_PI )
 	,	  1.0 ) );
   }
@@ -49,17 +49,18 @@ ParticleFilter::~ParticleFilter( void )
 }
 
 /*
-Long comment about update step will go here.
-*/
+ * The update step updates every particle and then resamples
+ */
 void ParticleFilter::update( const vec &motion, const std::vector<vec> &obs )
 {
   // record the observation
   this->latestobs = obs;
   gettimeofday( &this->obstimestamp, NULL );
   // update the particle based on motion and observation
-  for ( int i = 0; i < this->particles.size(); i++ ) {
-    this->particles[i].pose += motion;
-    this->particles[i].health = this->weight( this->particles[i] );
+  for ( Particle particle : this->particles ) {
+    particle.pose += motion;
+    // we might want to add some amount of noise right here
+    particle.health = this->weight( particle );
   }
 
   this->resample();
@@ -73,15 +74,18 @@ void ParticleFilter::update( const vec &motion, const std::vector<vec> &obs )
  */
 double ParticleFilter::weight( const Particle &particle ) 
 {
-	mat g = mat({
+	mat g = reshape(mat({ // gauss kernel
       1, 2, 1,
       2, 4, 2,
       1, 2, 1 
-	}).reshape( 3, 3 ).t();
-	
+	}), 3, 3 ).t();
 	g /= accu(g);
+
 	mat h = world.getPortion( particle.pose( 0 ) , particle.pose( 1 ), 1.0 );
-	return accu( g % h );
+
+  double cross_correlation = accu( g % h );
+
+	return cross_correlation;
 }
 
 /*
@@ -99,13 +103,13 @@ void ParticleFilter::resample( void )
   }
 
   wheel /= sum( wheel );
-  double max_weight = wheel.max();
+  max_weight = wheel.max();
   // start the resampling using the wheel
   int index = rand() % this->particles.size();
   double beta = 0.0;
   std::vector<Particle> new_particles;
  
-  for ( int i = 0; i < this->particle.size(); i++ ) {
+  for ( int i = 0; i < this->particles.size(); i++ ) {
   	beta += UniformPDF()  * 2.0 * max_weight;
   	while ( wheel(index) <= beta ) {
      		beta -= wheel(index);
@@ -121,25 +125,24 @@ void ParticleFilter::resample( void )
 /*
 Long comment about predict will go here
 */
-vec predict( double &sigma ) {
-  // return the average of the prediction
+vec ParticleFilter::predict( double &sigma ) {
+  // calculate E[X]
   vec mean = zeros<vec>(3);
-  for ( int i = 0; i < this->particles.size(); i++ ) {
-    mean += this->particles[i];
+  for ( Particle particle : this->particles ) {
+    mean += particle.pose;
   }
- 
   mean /= this->particles.size(); 
-  // mean squared error, only on the position
+
+  // sigma = cov(X, X) = E[X^2] - E[X]^2
   double error = 0.0;
   vec delta;
-  for ( int i = 0; i < this->particles.size(); i++ ) {
+  for ( Particle particle : this->particles ) {
       delta = vec({
-		mean[0] - this->particles[i][0]
-	      , mean[1] - this->particles[i][1] });
-      sigma  += dot( delta, delta );
+		      particle.pose(0) - mean(0)
+	      , particle.pose(1) - mean(1)
+      });
+      sigma += dot( delta, delta );
   }
-
-  sigma  /= this->particles.size();
+  sigma /= this->particles.size();
   return mean;
 }
-

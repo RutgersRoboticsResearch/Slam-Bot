@@ -15,12 +15,6 @@ class Particle {
     ~Particle(void);
 };
 
-/*
-class Landmark {
-  public:
-    arma::vec pose;
-};
-*/
 class Robot {
   public:
     arma::vec pose;
@@ -35,13 +29,9 @@ class ParticleFilter {
     ParticleFilter(GridMap &map, int nparticles = 1000);
     ~ParticleFilter(void);
     // RunParticleFilter
-   
-
     void update(const arma::vec &motion, const std::vector<arma::vec> &obs);
-    // ScanForWalls
-    std::vector<Landmark> getObstacles(const arma::vec &position);
     // PredictedLocalization
-    arma::vec predict(double *sigma = NULL);
+    arma::vec predict(double &sigma);
 
   private:
     //int particle_count;
@@ -51,7 +41,7 @@ class ParticleFilter {
     std::vector<arma::vec> latestobs;
     struct timeval obstimestamp;
     
-    void weight(const Particle &p);
+    double weight(const Particle &p);
     void resample(void);
 };
 
