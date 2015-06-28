@@ -15,11 +15,12 @@ class Particle {
     ~Particle(void);
 };
 
+/*
 class Landmark {
   public:
     arma::vec pose;
 };
-
+*/
 class Robot {
   public:
     arma::vec pose;
@@ -34,6 +35,8 @@ class ParticleFilter {
     ParticleFilter(GridMap &map, int nparticles = 1000);
     ~ParticleFilter(void);
     // RunParticleFilter
+   
+
     void update(const arma::vec &motion, const std::vector<arma::vec> &obs);
     // ScanForWalls
     std::vector<Landmark> getObstacles(const arma::vec &position);
