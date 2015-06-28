@@ -65,12 +65,6 @@ void ParticleFilter::update( const vec &motion, const std::vector<vec> &obs )
   this->resample();
 }
 
-std::vector<Landmark> ParticleFilter::getObstacles( const vec &position ) 
-{
-  mat field = map.grab_field(position(0), position(1), 50.0);
-  return obstacles;
-}
-
 /*
  * Weight takes the particular location at the grid
  * and does the elementwise multiplicaton. After that
@@ -79,14 +73,15 @@ std::vector<Landmark> ParticleFilter::getObstacles( const vec &position )
  */
 double ParticleFilter::weight( const Particle &particle ) 
 {
-	mat g = mat({ 1 ,2 , 1,
-		      2 ,4 , 2,
-		      1 ,2 , 1 
-		    }).reshape( 3,3 ).t();
+	mat g = mat({
+      1, 2, 1,
+      2, 4, 2,
+      1, 2, 1 
+	}).reshape( 3, 3 ).t();
 	
 	g /= accu(g);
 	mat h = world.getPortion( particle.pose( 0 ) , particle.pose( 1 ), 1.0 );
-	return accu(g%h);
+	return accu( g % h );
 }
 
 /*
@@ -112,8 +107,8 @@ void ParticleFilter::resample( void )
  
   for ( int i = 0; i < this->particle.size(); i++ ) {
   	beta += UniformPDF()  * 2.0 * max_weight;
-  	while ( wheel[index] <= beta ) {
-     		beta -= wheel[index];
+  	while ( wheel(index) <= beta ) {
+     		beta -= wheel(index);
      		index = ( index + 1 ) % wheel.size();
     	}
   	
