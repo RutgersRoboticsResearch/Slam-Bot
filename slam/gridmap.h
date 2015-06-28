@@ -4,44 +4,49 @@
 #include <string>
 #include <vector>
 #include <armadillo>
-#include <opencv2/core/core.hpp>
 
-class Grid {
+// Radix Tree using the granularity to determine the size
+class GridNode2 {
   public:
-    Grid(void);
-    Grid(int gridsize);
-    Grid(int left, int right, int up, int down);
-    ~Grid(void);
-    bool inRange(const int row, const int col);
+    GridNode2(double min_x, double max_x, double min_y, double max_y, void *env,
+        GridNode2 *parent = NULL, double precision = 1.0, double min_precision = 1.0);
+    ~GridNode2(void);
+    bool inRange(double x, double y);
+    double &operator()(const double x, const double y);
+    int get_index(double x, double y);
 
-    arma::mat map;
-    int left;
-    int right;
-    int up;
-    int down;
-    cv::Mat cv_image;
-    bool image_converted;
+    GridNode2 **subgrid;
+    int n_rows;
+    int n_cols;
+    double precision;
+    double min_precision;
+
+    GridNode2 *parent;
     void *env;
 
-  private:
-    void init(int left, int right, int up, int down);
+    double *map;
+    double min_x;
+    double max_x;
+    double min_y;
+    double max_y;
 };
 
-class GridMap {
+class GridMap { // 2d
   public:
     GridMap(void);
     GridMap(int gridsize);
     ~GridMap();
-    double &operator()(const int row, const int col);
+    double &operator()(const double i, const double j);
     void load(const std::string &foldername);
     void store(const std::string &foldername);
-    void disp(int row, int col, double radius);
-    arma::mat getPortion(int row, int col, double radius);
+    void disp(double i, double j, double radius);
+    arma::mat getPortion(double i, double j, double theta,
+        int n_rows, int n_cols, double precision = 1.0);
 
   private:
     int n_rows;
     int n_cols;
-    std::vector<Grid *> grids;
+    GridNode2 *root;
 };
 
 #endif

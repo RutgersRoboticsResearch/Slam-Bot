@@ -14,34 +14,101 @@ static int nmaps;
 static double dummyval;
 static int limit(int x, int a, int b);
 
-Grid::Grid(void) {
-  this->init(0, 0, STD_GRIDSIZE, STD_GRIDSIZE);
+GridNode2::GridNode2(double min_x, double max_x, double min_y, double max_y, void *env,
+    GridNode2 *parent, double precision, double min_precision) {
+  // this class needs to be manaaged properly
+  this->min_x = min_x;
+  this->max_x = max_x;
+  this->min_y = min_y;
+  this->max_y = max_y;
+  this->precision = precision;
+  this->min_precision = min_precision;
+  this->n_rows = (int)ceil((max_x - min_x) / precision);
+  this->n_cols = (int)ceil((max_y - min_y) / precision);
+  if (precision == min_precision) {
+    this->map = new double[this->n_rows * this->n_cols];
+    memset(this->map, 0, sizeof(double) * this->n_rows * this->n_cols);
+    this->subgrid = NULL;
+  } else {
+    this->subgrid = new GridNode2 *[this->n_rows * this->n_cols];
+    memset(this->subgrid, 0, sizeof(GridNode2 *) * this->n_rows * this->n_cols);
+    this->map = NULL;
+  }
+  this->env = env;
+  this->parent = parent;
 }
 
-Grid::Grid(int gridsize) {
-  this->init(0, 0, gridsize, gridsize);
+GridNode2::~GridNode2(void) {
+  if (this->subgrid) {
+    for (int i = 0; i < this->n_rows * this->n_cols; i++) {
+      if (this->subgrid[i]) {
+        delete this->subgrid[i];
+      }
+    }
+    delete this->subgrid;
+  }
+  if (this->map) {
+    delete this->map;
+  }
 }
 
-Grid::Grid(int left, int right, int up, int down) {
-  this->init(left, right, up, down);
+bool GridNode2::inRange(double x, double y) {
+  return this->min_x <= x && x < this->max_x &&
+         this->min_y <= y && y < this->max_y;
 }
 
-Grid::~Grid(void) {
+double &GridNode2::operator()(const double x, const double y) {
+  GridNode2 *g = this;
+  double new_precision;
+  double new_width;
+  double new_height;
+  double new_min_x;
+  double new_max_x;
+  double new_min_y;
+  double new_max_y;
+  while (!g->inRange(x, y)) { // resolve upper echelon
+    if (!g->parent) {
+      new_precision = g->precision * 2.0;
+      new_width = new_precision * g->n_rows;
+      new_height = new_precision * g->n_cols;
+      new_min_x = floor(g->min_x / new_width) * new_width;
+      new_max_x = new_min_x + new_width;
+      new_min_y = floor(g->min_y / new_height) * new_height;
+      new_max_y = new_min_y + new_height;
+      g->parent = new GridNode2(new_min_x, new_max_x, new_min_y, new_max_y, this->env,
+          NULL, new_precision, this->min_precision);
+      g->parent->subgrid[g->parent->get_index(g->min_x, g->min_y)] = g;
+      ((GridMap *)this->env)->root = g->parent;
+    }
+    g = g->parent;
+  }
+  while (g->precision > this->min_precision) { // resolve lower echelon
+    if (!g->subgrid[g->get_index(x, y)]) {
+      new_precision = g->precision / 2.0;
+      if (new_precision < this->min_precision) {
+        new_precision = this->min_precision;
+      }
+      new_width = new_precision * g->n_rows;
+      new_height = new_precision * g->n_cols;
+      new_min_x = floor(x / new_width) * new_width;
+      new_max_x = new_min_x + new_width;
+      new_min_y = floor(y / new_height) * new_height;
+      new_max_y = new_min_y + new_height;
+      GridNode2 *child = new GridNode2(
+          new_min_x, new_max_x, new_min_y, new_max_y, this->env,
+          g, new_precision, this->min_precision);
+      g->subgrid[g->get_index(x, y)] = child;
+      g = child;
+    } else {
+      g = g->subgrid[g->get_index(x, y)];
+    }
+  }
+  return g->map[g->get_index(x, y)];
 }
 
-bool Grid::inRange(const int row, const int col) {
-  return this->left <= col && col < this->right &&
-         this->down <= row && row < this->up;
-}
-
-void Grid::init(int left, int right, int up, int down) {
-  this->left = left;
-  this->right = right;
-  this->up = up;
-  this->down = down;
-  this->map = arma::zeros<arma::mat>(up - down, right - left);
-  this->env = NULL;
-  this->image_converted = false;
+int GridNode2::get_index(double x, double y) {
+  return (int)floor((y - this->min_y) / this->precision) * this->n_cols +
+         (int)floor((x - this->min_x) / this->precision);
 }
 
 GridMap::GridMap(void) {
@@ -55,81 +122,14 @@ GridMap::GridMap(int gridsize) {
 }
 
 GridMap::~GridMap() {
-  for (int i = 0; i < this->grids.size(); i++) {
-    delete this->grids[i];
+  for (Grid *g : this->grids) {
+    delete g;
   }
   this->grids.clear();
 }
 
-double &GridMap::operator()(const int row, const int col) {
-  Grid *grid = NULL;
-  int beg = 0;
-  int mid;
-  int end = this->grids.size() - 1;
-  // try to find the grid item by using binary search
-  while (beg != end) {
-    if (beg + 1 == end) {
-      if (this->grids[beg]->inRange(row, col)) {
-        grid = this->grids[beg];
-      } else if (this->grids[end]->inRange(row, col)) {
-        grid = this->grids[end];
-      }
-      break;
-    }
-    mid = (beg + end) / 2;
-    if (this->grids[mid]->inRange(row, col)) {
-      grid = this->grids[mid];
-      break;
-    }
-    if (row < this->grids[mid]->down) {
-      end = mid;
-    } else if (this->grids[mid]->up <= row) {
-      beg = mid;
-    } else if (col < this->grids[mid]->left) {
-      end = mid;
-    } else if (this->grids[mid]->right <= col) {
-      beg = mid;
-    }
-  }
-  if (!grid) {
-    // create the grid item
-    int ltrunc = row / this->n_rows;
-    int rtrunc = ltrunc + 1;
-    int dtrunc = col / this->n_cols;
-    int utrunc = dtrunc + 1;
-    grid = new Grid(
-        ltrunc * this->n_rows,
-        rtrunc * this->n_rows,
-        utrunc * this->n_cols,
-        dtrunc * this->n_cols);
-    grid->env = (void *)this;
-    // insert the grid item
-    if (this->grids.size() == 0) {
-      this->grids.push_back(grid);
-    } else {
-      std::vector<Grid *>::iterator it;
-      if (row < this->grids[beg]->down) {
-        it = this->grids.begin() + beg;
-      } else if (this->grids[end]->up <= row) {
-        it = this->grids.begin() + end + 1;
-      } else if (col < this->grids[beg]->left) {
-        it = this->grids.begin() + beg;
-      } else if (this->grids[end]->right <= col) {
-        it = this->grids.begin() + end + 1;
-      } else {
-        // middle insert should only happen when beg != end
-        if (beg != end) {
-          it = this->grids.begin() + end;
-        } else {
-          // error: just insert it at the end
-          it = this->grids.end();
-        }
-      }
-      this->grids.insert(it, grid);
-    }
-  }
-  grid->image_converted = false;
-  return grid->map(row, col);
+double &GridMap::operator()(const double i, const double j) {
+  return (*this->root)(i, j);
 }
 
 void GridMap::load(const std::string &foldername) {
@@ -217,6 +217,7 @@ arma::mat GridMap::getPortion(int row, int col, double radius) {
   int d = (int)ceil(radius);
   int size = d * 2 + 1;
   arma::mat map = arma::zeros<arma::mat>(radius, radius);
+  int 
   for (int i = row - d; i <= row + d; i++) {
     for (int j = col - d; j <= col + d; j++) {
       map(i, j) = (*this)(i, j);
