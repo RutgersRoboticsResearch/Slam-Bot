@@ -4,7 +4,6 @@
 #include <array>
 #include <unistd.h>
 #include <cstdlib>
-#include "imgproc.h"
 #include "particlefilter.h"
 
 using namespace arma;
@@ -81,7 +80,7 @@ double ParticleFilter::weight( const Particle &particle )
 	}), 3, 3 ).t();
 	g /= accu(g);
 
-	mat h = world.getPortion( particle.pose( 0 ) , particle.pose( 1 ), 1.0 );
+	mat h = world.getPortion( particle.pose( 0 ) , particle.pose( 1 ), 0.0, 3 );
 
   double cross_correlation = accu( g % h );
 
@@ -95,10 +94,9 @@ void ParticleFilter::resample( void )
 {
   // create the probability wheel
   double max_weight = 0.0;
-  double sum_weight = 0.0;
 
   vec wheel( this->particles.size() );
-  for ( int i = 0; i < this->particles.size(); i++ ) {
+  for ( int i = 0; i < (int)this->particles.size(); i++ ) {
     wheel(i) = this->particles[i].health;
   }
 
@@ -109,7 +107,7 @@ void ParticleFilter::resample( void )
   double beta = 0.0;
   std::vector<Particle> new_particles;
  
-  for ( int i = 0; i < this->particles.size(); i++ ) {
+  for ( int i = 0; i < (int)this->particles.size(); i++ ) {
   	beta += UniformPDF()  * 2.0 * max_weight;
   	while ( wheel(index) <= beta ) {
      		beta -= wheel(index);
@@ -134,7 +132,6 @@ vec ParticleFilter::predict( double &sigma ) {
   mean /= this->particles.size(); 
 
   // sigma = cov(X, X) = E[X^2] - E[X]^2
-  double error = 0.0;
   vec delta;
   for ( Particle particle : this->particles ) {
       delta = vec({

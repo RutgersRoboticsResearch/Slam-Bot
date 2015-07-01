@@ -1,8 +1,6 @@
 #ifndef __SB_GRIDMAP_H__
 #define __SB_GRIDMAP_H__
 
-#include <stdint.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,16 +13,17 @@ struct gridnode { // private structure
   gridnode_t **subgrid;
   int n_rows;
   int n_cols;
-  int unitsize; // lowest of 1
+  float precision;
+  float min_precision;
 
   gridnode_t *parent;
   gridmap_t *env;
 
-  uint8_t *map;
-  int min_x; // inclusive
-  int max_x; // exclusive
-  int min_y; // inclusive
-  int max_y; // exclusive
+  float *map;
+  float min_x; // inclusive
+  float max_x; // exclusive
+  float min_y; // inclusive
+  float max_y; // exclusive
 };
 
 struct gridmap {
@@ -33,16 +32,17 @@ struct gridmap {
   int n_gridsize;
   gridnode_t *quad[4];
   int blocksize;
+  float min_precision;
 };
 
 int gridmap_create(gridmap_t *map);
 void gridmap_destroy(gridmap_t *map);
-uint8_t gridmap_get(gridmap_t *map, int x, int y);
-void gridmap_set(gridmap_t *map, int x, int y, uint8_t value);
+float gridmap_get(gridmap_t *map, float x, float y);
+void gridmap_set(gridmap_t *map, float x, float y, float value);
 void gridmap_load(gridmap_t *map, char *foldername);
 void gridmap_store(gridmap_t *map, char *foldername);
-void gridmap_query(gridmap_t *map, int x, int y, float theta,
-    uint8_t *buffer, int diameter, int unitsize);
+void gridmap_query(gridmap_t *map, float x, float y, float theta,
+    float *buffer, int diameter, float precision);
 
 #ifdef __cplusplus
 }

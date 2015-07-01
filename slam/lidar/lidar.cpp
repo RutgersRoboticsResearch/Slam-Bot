@@ -1,4 +1,7 @@
+#include <cstdio>
+#include <cstring>
 #include <dirent.h>
+#include <cmath>
 #include <sys/types.h>
 #include "lidar.h"
 
@@ -26,7 +29,7 @@ Lidar::Lidar(void) {
     return;
   }
   // By policy, choose the first device. Later on, this might cause errors.
-  opt_com_path = std::string("/dev/") + possible_devs[0];
+  opt_com_path = possible_devs[0];
 
   if (!(this->drv = RPlidarDriver::CreateDriver(RPlidarDriver::DRIVER_TYPE_SERIALPORT))) {
     return;
@@ -46,6 +49,7 @@ Lidar::Lidar(void) {
 
   this->drv->startScan();
   this->count = 720;
+  this->lidar_data.clear();
 }
 
 /** Lidar Destructor
@@ -62,16 +66,19 @@ Lidar::~Lidar(void) {
 void Lidar::update(void) {
   size_t c = 720;
   u_result op_result = this->drv->grabScanData(this->nodes, c);
-  arma::vec pt(2);
+  polar_t coord;
   this->count = c;
   if (IS_OK(op_result)) {
     this->drv->ascendScanData(this->nodes, this->count);
     this->lidar_data.clear();
     for (int i = 0; i < this->count; i++) {
-      pt(1) = (this->nodes[i].angle_q6_checkbit >>
-          RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0 + 270.0;
-      pt(0) = nodes[i].distance_q2 / 20.0;
-      this->lidar_data.push_back(pt);
+      coord.theta = (this->nodes[i].angle_q6_checkbit >>
+          RPLIDAR_RESP_MEASUREMENT_ANGLE_SHIFT) / 64.0;
+      coord.theta *= M_PI / 180.0;
+      coord.radius = nodes[i].distance_q2 / 20.0;
+      if (coord.radius > 0.0f && coord.radius < 500.0f) {
+        this->lidar_data.push_back(coord);
+      }
     }
   }
 }
@@ -98,5 +105,14 @@ int Lidar::status(void) {
 }
 
 bool Lidar::connected(void) {
-  return this->status == 1;
+  return this->status() == 1;
+}
+
+std::vector<polar_t> Lidar::grabPoints(void) {
+  return this->lidar_data;
+}
+
+std::vector<polar_t> Lidar::readPoints(void) {
+  this->update();
+  return this->lidar_data;
 }

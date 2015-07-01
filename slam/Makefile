@@ -1,25 +1,41 @@
+CC = gcc
 CXX = g++
-CFLAGS = -std=c++11
-INCLUDE = -I$(shell pwd)/../visual
-LIBS = -larmadillo
+CFLAGS = -std=c++11 -Wall
+LIDAR_DIR = $(shell pwd)/lidar
+RPLIDAR_DIR = $(LIDAR_DIR)/rplidar_sdk
+INCLUDE = -I$(LIDAR_DIR) -I$(RPLIDAR_DIR) #-I$(shell pwd)/../visual
+LIBS = -larmadillo -lSDL2 -L$(RPLIDAR_DIR) -lrplidar_sdk
 OBJS = gridmap.o particlefilter.o slam.o
-OGMOBJS = ogm_exec.o gridmap.o
+OGMOBJS = gridmap.o $(LIDAR_DIR)/lidar.o test.o
 TARGET = slam
-OGMTARGET = ogm_build
+OGMTARGET = test
 
-all: $(OBJS)
+all: subdirs $(OGMOBJS) test
 
-ogm_build: $(OGMOBJS)
-	$(CXX) $(CFLAGS) -o $@ $^ $(INCLUDE) $(LIBS)
+subdirs:
+	make -C $(LIDAR_DIR)
 
-gridmap.o: gridmap.cpp
-	$(CXX) $(CFLAGS) `pkg-config --cflags opencv` -o $@ -c $< $(INCLUDE)
+test: $(OGMOBJS)
+	$(CXX) $(CFLAGS) -pthread -o $@ $^ $(INCLUDE) $(LIBS)
 
-ogm_exec.o: ogm_exec.cpp
-	$(CXX) $(CFLAGS) -o $@ -c $<
+test2: $(LIDAR_DIR)/lidar.o test2.o
+	$(CXX) $(CFLAGS) -pthread -o $@ $^ $(INCLUDE) $(LIBS)
+
+test2.o: test2.cpp
+	$(CXX) $(CFLAGS) -o $@ -c $< $(INCLUDE)
+
+gridmap.o: sgridmap.c
+	$(CC) --std=gnu99 -Wall -Werror -o $@ -c $<
+
+test.o: test.cpp
+	$(CXX) $(CFLAGS) -o $@ -c $< $(INCLUDE)
 
 particlefilter.o: particlefilter.cpp
 	$(CXX) $(CFLAGS) -o $@ -c $< $(INCLUDE)
 
+slam.o: slam.cpp
+	$(CXX) $(CFLAGS) -o $@ -c $< $(INCLUDE)
+
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJS) $(TARGET) $(OGMOBJS) $(OGMTARGET) test2.o test2
+	make clean -C $(LIDAR_DIR)
