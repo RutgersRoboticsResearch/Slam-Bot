@@ -41,7 +41,7 @@ uint8_t gridmap_get(gridmap_t *map, int x, int y);
 void gridmap_set(gridmap_t *map, int x, int y, uint8_t value);
 void gridmap_load(gridmap_t *map, char *foldername);
 void gridmap_store(gridmap_t *map, char *foldername);
-void gridmap_query(gridmap_t *map, int x, int y, float theta,
+void gridmap_query(gridmap_t *map, int x, int y, double theta,
     uint8_t *buffer, int diameter, int unitsize);
 
 #ifdef __cplusplus

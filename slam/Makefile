@@ -10,7 +10,7 @@ OGMOBJS = gridmap.o $(LIDAR_DIR)/lidar.o test.o
 TARGET = slam
 OGMTARGET = test
 
-all: subdirs $(OGMOBJS) test
+all: subdirs $(OGMOBJS) $(OGMTARGET)
 
 subdirs:
 	make -C $(LIDAR_DIR)
@@ -18,13 +18,7 @@ subdirs:
 test: $(OGMOBJS)
 	$(CXX) $(CFLAGS) -pthread -o $@ $^ $(INCLUDE) $(LIBS)
 
-test2: $(LIDAR_DIR)/lidar.o test2.o
-	$(CXX) $(CFLAGS) -pthread -o $@ $^ $(INCLUDE) $(LIBS)
-
-test2.o: test2.cpp
-	$(CXX) $(CFLAGS) -o $@ -c $< $(INCLUDE)
-
-gridmap.o: sgridmap.c
+gridmap.o: gridmap.c
 	$(CC) --std=gnu99 -Wall -Werror -o $@ -c $<
 
 test.o: test.cpp
@@ -37,5 +31,5 @@ slam.o: slam.cpp
 	$(CXX) $(CFLAGS) -o $@ -c $< $(INCLUDE)
 
 clean:
-	rm -f $(OBJS) $(TARGET) $(OGMOBJS) $(OGMTARGET) test2.o test2
+	rm -f $(OBJS) $(TARGET) $(OGMOBJS) $(OGMTARGET)
 	make clean -C $(LIDAR_DIR)
