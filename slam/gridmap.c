@@ -15,31 +15,30 @@
 
 static int nmaps;
 
-static int gridnode_create(gridnode_t *node, float min_x, float max_x, float min_y, float max_y,
-    gridmap_t *env, gridnode_t *parent, float unitsize, float min_unitsize);
+static int gridnode_create(gridnode_t *node, int min_x, int max_x, int min_y, int max_y,
+    gridmap_t *env, gridnode_t *parent, int unitsize, int min_unitsize);
 static void gridnode_destroy(gridnode_t *node);
-static int gridnode_inRange(gridnode_t *node, float x, float y);
-static float *gridnode_reference(gridnode_t *node, float x, float y, int allow_create);
-static int gridnode_getIndex(gridnode_t *node, float x, float y);
+static int gridnode_inRange(gridnode_t *node, int x, int y);
+static int *gridnode_reference(gridnode_t *node, int x, int y, int allow_create);
+static int gridnode_getIndex(gridnode_t *node, int x, int y);
 static void gridnode_load(gridnode_t *node, char *filepath,
-    float min_x, float max_x, float min_y, float max_y,
-    int blocksize, size_t floatsize, float min_unitsize);
+    int min_x, int max_x, int min_y, int max_y,
+    int blocksize, size_t intsize, int min_unitsize);
 static void gridnode_store(gridnode_t *node, char *foldername, FILE *infofile);
-static int gridmap_determineQuad(gridmap_t *map, float x, float y);
+static int gridmap_getQuad(gridmap_t *map, int x, int y);
 static void gridmap_appendGridNode(gridmap_t *map, gridnode_t *node);
 
-static int gridnode_create(gridnode_t *node, float min_x, float max_x, float min_y, float max_y,
+static int gridnode_create(gridnode_t *node, int min_x, int max_x, int min_y, int max_y,
     gridmap_t *env, gridnode_t *parent, int unitsize) {
   node->min_x = min_x;
   node->max_x = max_x;
   node->min_y = min_y;
   node->max_y = max_y;
   node->unitsize = unitsize;
-  node->min_unitsize = min_unitsize;
   node->n_rows = (max_y - min_y) / unitsize;
-  node->n_cols = (int)ceil((max_x - min_x) / unitsize);
+  node->n_cols = (max_x - min_x) / unitsize;
   if (unitsize == min_unitsize) {
-    node->map = (float *)calloc(node->n_rows * node->n_cols, sizeof(float));
+    node->map = (int *)calloc(node->n_rows * node->n_cols, sizeof(uint8_t));
     node->subgrid = NULL;
   } else {
     node->subgrid = (gridnode_t **)calloc(node->n_rows * node->n_cols, sizeof(gridnode_t *));
@@ -62,19 +61,12 @@ static void gridnode_destroy(gridnode_t *node) {
   }
 }
 
-static int gridnode_inRange(gridnode_t *node, float x, float y) {
-  return node->min_x <= x && x < node->max_x &&
-    node->min_y <= y && y < node->max_y;
+static int gridnode_inRange(gridnode_t *node, int x, int y) {
+  return node->min_x <= x && x < node->max_x && node->min_y <= y && y < node->max_y;
 }
 
-float *gridnode_reference(gridnode_t *node, float x, float y, int allow_create) {
-  float new_unitsize;
-  float new_width;
-  float new_height;
-  float new_min_x;
-  float new_max_x;
-  float new_min_y;
-  float new_max_y;
+int *gridnode_reference(gridnode_t *node, int x, int y, int allow_create) {
+  gridnode_t *new_node;
   gridnode_t *g;
   g = node;
   // resolve upper range
@@ -88,28 +80,34 @@ float *gridnode_reference(gridnode_t *node, float x, float y, int allow_create) 
       } else {
         nmaps++;
       }
+      new_node = (gridnode_t *)malloc(sizeof(gridnode_t));
       // define new parameters
-      new_unitsize = g->unitsize * (float)g->n_rows;
-      new_width = new_unitsize * (float)g->n_rows;
-      new_height = new_unitsize * (float)g->n_cols;
-      new_min_x = floor(g->min_x / new_width) * new_width;
-      new_max_x = new_min_x + new_width;
-      new_min_y = floor(g->min_y / new_height) * new_height;
-      new_max_y = new_min_y + new_height;
-      // create the parent
-      g->parent = (gridnode_t *)malloc(sizeof(gridnode_t));
-      gridnode_create(g->parent, new_min_x, new_max_x, new_min_y, new_max_y,
-          g->env, NULL, new_unitsize, g->min_unitsize);
+      new_node->n_rows = g->n_rows;
+      new_node->n_cols = g->n_cols;
+      new_node->unitsize = g->unitsize * g->n_rows;
+      new_node->subgrid = (gridnode_t **)calloc(g->n_rows * g->n_cols, sizeof(gridnode_t *));
+      new_node->map = NULL;
+      // making the assumption that the structure is a quad starting at 0 in at least min or max
+      // not a general purpose algorithm
+      new_node->min_x = g->min_x * g->n_cols;
+      new_node->max_x = g->max_x * g->n_cols;
+      new_node->min_y = g->min_y * g->n_rows;
+      new_node->max_y = g->max_y * g->n_rows;
       // attach the parent to the current node and the env
-      g->parent->subgrid[gridnode_getIndex(g->parent, g->min_x, g->min_y)] = g;
-      g->env->quad[gridmap_determineQuad(g->env, g->min_x, g->min_y)] = g->parent;
-      gridmap_appendGridNode(g->env, g->parent);
+      new_node->subgrid[gridnode_getIndex(new_node, g->min_x, g->min_y)] = g;
+      g->parent = new_node;
+      new_node->env = g->env;
+      g->env->quad[gridmap_getQuad(g->env, g->min_x, g->min_y)] = new_node;
+      gridmap_appendGridNode(g->env, new_node);
+      g = new_node;
+    } else {
+      g = g->parent;
     }
-    g = g->parent;
   }
   // resolve lower range
   while (g->unitsize > g->min_unitsize) {
     if (!g->subgrid[gridnode_getIndex(g, x, y)]) {
+      int new_blocksize;
       if (!allow_create) {
         return NULL;
       } else if (nmaps >= MAX_MAPS) {
@@ -118,25 +116,43 @@ float *gridnode_reference(gridnode_t *node, float x, float y, int allow_create) 
       } else {
         nmaps++;
       }
+      new_node = (gridnode_t *)malloc(sizeof(gridnode_t));
       // define new parameters
-      new_unitsize = g->unitsize / (float)g->n_rows;
-      if (new_unitsize < g->min_unitsize) {
-        new_unitsize = g->min_unitsize;
+      new_node->n_rows = g->n_rows;
+      new_node->n_cols = g->n_cols;
+      new_node->unitsize = g->unitsize / g->n_rows;
+      if (new_node->unitsize == 1) {
+        new_node->map = (uint8_t **)calloc(g->n_rows * g->n_cols, sizeof(uint8_t));
+        new_node->subgrid = NULL;
+      } else {
+        new_node->subgrid = (gridnode_t **)calloc(g->n_rows * g->n_cols, sizeof(gridnode_t *));
+        new_node->map = NULL;
       }
-      new_width = new_unitsize * (float)g->n_rows;
-      new_height = new_unitsize * (float)g->n_cols;
-      new_min_x = floor(x / new_width) * new_width;
-      new_max_x = new_min_x + new_width;
-      new_min_y = floor(y / new_width) * new_width;
-      new_max_y = new_min_y + new_width;
-      // create the child
-      gridnode_t *child = (gridnode_t *)malloc(sizeof(gridnode_t));
-      gridnode_create(child, new_min_x, new_max_x, new_min_y, new_max_y,
-          g->env, g, new_unitsize, g->min_unitsize);
+      new_blocksize = new_node->blocksize * g->n_rows;
+      if (x >= 0) {
+        new_node->min_x = x - (x % new_blocksize);
+        new_node->max_x = new_node->min_x + new_blocksize;
+      } else {
+        x++;
+        new_node->max_x = x - (x % new_blocksize);
+        new_node->min_x = new_node->max_x - new_blocksize;
+        x--;
+      }
+      if (y >= 0) {
+        new_node->min_y = y - (y % new_blocksize);
+        new_node->max_y = new_node->min_y + new_blocksize;
+      } else {
+        y++;
+        new_node->max_y = y - (y % new_blocksize);
+        new_node->min_y = new_node->max_y - new_blocksize;
+        y--;
+      }
       // attach the child to the current node
-      g->subgrid[gridnode_getIndex(g, x, y)] = child;
-      g = child;
-      gridmap_appendGridNode(g->env, child);
+      g->subgrid[gridnode_getIndex(g, x, y)] = new_node;
+      new_node->parent = g;
+      new_node->env = g->env;
+      gridmap_appendGridNode(g->env, new_node);
+      g = new_node;
     } else {
       g = g->subgrid[gridnode_getIndex(g, x, y)];
     }
@@ -144,30 +160,30 @@ float *gridnode_reference(gridnode_t *node, float x, float y, int allow_create) 
   return &g->map[gridnode_getIndex(g, x, y)];
 }
 
-static int gridnode_getIndex(gridnode_t *node, float x, float y) {
+static int gridnode_getIndex(gridnode_t *node, int x, int y) {
   return (int)floor((y - node->min_y) / node->unitsize) * node->n_cols +
     (int)floor((x - node->min_x) / node->unitsize);
 }
 
 static void gridnode_load(gridnode_t *node, char *filepath,
-    float min_x, float max_x, float min_y, float max_y,
-    int blocksize, size_t floatsize, float min_unitsize) {
-  float x;
-  float y;
+    int min_x, int max_x, int min_y, int max_y,
+    int blocksize, size_t intsize, int min_unitsize) {
+  int x;
+  int y;
   int i;
   int j;
   int n_elems;
   int datafd;
-  float *databuf;
+  int *databuf;
   n_elems = blocksize * blocksize;
-  databuf = (float *)malloc(sizeof(float) * n_elems);
+  databuf = (int *)malloc(sizeof(int) * n_elems);
   datafd = open(filepath, O_RDONLY);
-  read(datafd, (void *)databuf, sizeof(float) * n_elems);
+  read(datafd, (void *)databuf, sizeof(int) * n_elems);
   close(datafd);
   for (i = 0; i < blocksize; i++) {
     for (j = 0; j < blocksize; j++) {
-      x = (float)j * min_unitsize + min_x;
-      y = (float)i * min_unitsize + min_y;
+      x = (int)j * min_unitsize + min_x;
+      y = (int)i * min_unitsize + min_y;
       *gridnode_reference(node, x, y, 1) = databuf[i * blocksize + j];
     }
   }
@@ -188,13 +204,13 @@ static void gridnode_store(gridnode_t *node, char *foldername, FILE *infofile) {
   sprintf(filename, "%s/L%fR%fD%fU%f.txt", foldername,
       node->min_x, node->max_x, node->min_y, node->max_y);
   datafd = open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-  write(datafd, (void *)node->map, sizeof(float) * node->n_rows * node->n_cols);
+  write(datafd, (void *)node->map, sizeof(int) * node->n_rows * node->n_cols);
   close(datafd);
   // write to an image
   image = SDL_CreateRGBSurface(0, node->n_rows, node->n_cols, 32, 0, 0, 0, 0);
   for (i = 0; i < node->n_rows; i++) {
     for (j = 0; j < node->n_cols; j++) {
-      float v;
+      int v;
       uint8_t color;
       v = node->map[gridnode_getIndex(node, j, i)];
       v = (v < 0.0f) ? 0.0f : ((v > 1.0f) ? 1.0f : v);
@@ -209,7 +225,7 @@ static void gridnode_store(gridnode_t *node, char *foldername, FILE *infofile) {
   SDL_FreeSurface(image);
 }
 
-static int gridmap_determineQuad(gridmap_t *map, float x, float y) {
+static int gridmap_getQuad(gridmap_t *map, int x, int y) {
   int index;
   index = 0;
   index |= (x < 0) << 0;
@@ -235,24 +251,24 @@ static void gridmap_appendGridNode(gridmap_t *map, gridnode_t *node) {
 }
 
 int gridmap_create(gridmap_t *map) {
-  float size;
+  int size;
   int i;
-  size = (float)STD_GRIDSIZE;
+  size = (int)STD_GRIDSIZE;
   map->blocksize = STD_GRIDSIZE;
   map->min_unitsize = 1.0f;
   for (i = 0; i < 4; i++) {
     map->quad[i] = (gridnode_t *)malloc(sizeof(gridnode_t));
   }
-  gridnode_create(map->quad[gridmap_determineQuad(map, 1.0f, 1.0f)],
+  gridnode_create(map->quad[gridmap_getQuad(map, 1.0f, 1.0f)],
       0.0f, size, 0.0f, size,
       map, NULL, 1.0f, map->min_unitsize);
-  gridnode_create(map->quad[gridmap_determineQuad(map, -1.0f, 1.0f)],
+  gridnode_create(map->quad[gridmap_getQuad(map, -1.0f, 1.0f)],
       -size, 0.0f, 0.0f, size,
       map, NULL, 1.0f, map->min_unitsize);
-  gridnode_create(map->quad[gridmap_determineQuad(map, 1.0f, -1.0f)],
+  gridnode_create(map->quad[gridmap_getQuad(map, 1.0f, -1.0f)],
       0.0f, size, -size, 0.0f,
       map, NULL, 1.0f, map->min_unitsize);
-  gridnode_create(map->quad[gridmap_determineQuad(map, -1.0f, -1.0f)],
+  gridnode_create(map->quad[gridmap_getQuad(map, -1.0f, -1.0f)],
       -size, 0.0f, -size, 0.0f,
       map, NULL, 1.0f, map->min_unitsize);
   for (i = 0; i < 4; i++) {
@@ -275,26 +291,26 @@ void gridmap_destroy(gridmap_t *map) {
   memset(map, 0, sizeof(gridmap_t));
 }
 
-float gridmap_get(gridmap_t *map, float x, float y) {
-  float *valueref;
-  valueref = gridnode_reference(map->quad[gridmap_determineQuad(map, x, y)], x, y, 0);
+int gridmap_get(gridmap_t *map, int x, int y) {
+  int *valueref;
+  valueref = gridnode_reference(map->quad[gridmap_getQuad(map, x, y)], x, y, 0);
   return valueref ? (*valueref) : 0.0f;
 }
 
-void gridmap_set(gridmap_t *map, float x, float y, float value) {
-  *gridnode_reference(map->quad[gridmap_determineQuad(map, x, y)], x, y, 1) = value;
+void gridmap_set(gridmap_t *map, int x, int y, int value) {
+  *gridnode_reference(map->quad[gridmap_getQuad(map, x, y)], x, y, 1) = value;
 }
 
 void gridmap_load(gridmap_t *map, char *foldername) {
   FILE *infofile;
   char buffer[256];
   int blocksize;
-  size_t floatsize;
-  float min_unitsize;
-  float left;
-  float right;
-  float down;
-  float up;
+  size_t intsize;
+  int min_unitsize;
+  int left;
+  int right;
+  int down;
+  int up;
   char *line;
   size_t n;
   sprintf(buffer, "%s/info.txt", foldername);
@@ -303,7 +319,7 @@ void gridmap_load(gridmap_t *map, char *foldername) {
   }
   line = NULL;
   if (getline(&line, &n, infofile) > 0) {
-    sscanf(line, "%d %zd %f\n", &blocksize, &floatsize, &min_unitsize);
+    sscanf(line, "%d %zd %f\n", &blocksize, &intsize, &min_unitsize);
     free(line);
     line = NULL;
   }
@@ -311,8 +327,8 @@ void gridmap_load(gridmap_t *map, char *foldername) {
     sscanf(line, "L%fR%fD%fL%f\n", &left, &right, &down, &up);
     line[strlen(line) - 1] = '\0';
     sprintf(buffer, "%s/%s.txt", foldername, line);
-    gridnode_load(map->quad[gridmap_determineQuad(map, left, down)], buffer,
-        left, right, down, up, blocksize, floatsize, min_unitsize);
+    gridnode_load(map->quad[gridmap_getQuad(map, left, down)], buffer,
+        left, right, down, up, blocksize, intsize, min_unitsize);
     free(line);
     line = NULL;
   }
@@ -331,27 +347,27 @@ void gridmap_store(gridmap_t *map, char *foldername) {
   mkdir(foldername, 0755);
   sprintf(buffer, "%s/info.txt", foldername);
   infofile = fopen(buffer, "w");
-  fprintf(infofile, "%d %zd %f\n", map->blocksize, sizeof(float), map->min_unitsize);
+  fprintf(infofile, "%d %zd %f\n", map->blocksize, sizeof(int), map->min_unitsize);
   for (i = 0; i < map->n_grids; i++) {
     gridnode_store(map->grids[i], foldername, infofile);
   }
   fclose(infofile);
 }
 
-void gridmap_query(gridmap_t *map, float x, float y, float theta,
-    float *buffer, int diameter, float unitsize) {
+void gridmap_query(gridmap_t *map, int x, int y, int theta,
+    int *buffer, int diameter, int unitsize) {
   int radius;
   int i;
   int j;
-  float x0;
-  float y0;
-  float X;
-  float Y;
+  int x0;
+  int y0;
+  int X;
+  int Y;
   radius = diameter / 2;
   for (i = 0; i < diameter; i++) {
     for (j = 0; j < diameter; j++) {
-      x0 = (float)(j - radius) * unitsize;
-      y0 = (float)(i - radius) * unitsize;
+      x0 = (int)(j - radius) * unitsize;
+      y0 = (int)(i - radius) * unitsize;
       X = x0 * cos(theta) - y0 * sin(theta) + x;
       Y = x0 * sin(theta) + y0 * cos(theta) + y;
       buffer[i * diameter + j] = gridmap_get(map, X, Y);
