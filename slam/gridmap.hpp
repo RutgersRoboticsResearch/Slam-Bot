@@ -13,7 +13,7 @@ class GridMap {
     void load(const std::string &foldername);
     void store(const std::string &foldername);
     void setPortion(double x, double y, double theta,
-        arma::mat H, double precision = 1.0);
+        const arma::mat &H, double precision = 1.0);
     arma::mat getPortion(double x, double y, double theta,
         int diameter, double precision = 1.0);
 
