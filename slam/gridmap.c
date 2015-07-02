@@ -172,11 +172,11 @@ static void gridnode_load(gridnode_t *node, char *filepath,
   int j;
   int n_elems;
   int datafd;
-  int *databuf;
+  uint8_t *databuf;
   n_elems = blocksize * blocksize;
-  databuf = (int *)malloc(sizeof(int) * n_elems);
+  databuf = (uint8_t *)malloc(sizeof(uint8_t) * n_elems);
   datafd = open(filepath, O_RDONLY);
-  read(datafd, (void *)databuf, sizeof(int) * n_elems);
+  read(datafd, (void *)databuf, sizeof(uint8_t) * n_elems);
   close(datafd);
   for (i = 0; i < blocksize; i++) {
     for (j = 0; j < blocksize; j++) {
@@ -209,11 +209,8 @@ static void gridnode_store(gridnode_t *node, char *foldername, FILE *infofile) {
   image = SDL_CreateRGBSurface(0, node->n_rows, node->n_cols, 32, 0, 0, 0, 0);
   for (i = 0; i < node->n_rows; i++) {
     for (j = 0; j < node->n_cols; j++) {
-      int v;
       uint8_t color;
-      v = node->map[gridnode_getIndex(node, j, i)];
-      v = (v < 0.0f) ? 0.0f : ((v > 1.0f) ? 1.0f : v);
-      color = (uint8_t)(v * 255.0f);
+      color = node->map[gridnode_getIndex(node, j, i)];
       ((uint32_t *)image->pixels)[i * node->n_cols + j] =
         SDL_MapRGB(image->format, color, color, color);
     }
