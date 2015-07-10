@@ -5,8 +5,8 @@
 #include "serial.h"
 
 #define NO_ROBOT            0x00000000
-#define TENNIS_BALL_ROBOT   0x00000001
-#define TACHIKOMA           0x00000002
+#define TENNIS_BALL_ROBOT   0x00000002
+#define TACHIKOMA           0x00000003
 
 class BaseRobot {
   public:

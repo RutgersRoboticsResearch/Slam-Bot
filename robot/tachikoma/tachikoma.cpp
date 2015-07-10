@@ -169,6 +169,39 @@ vec Tachikoma::recv(void) {
   return enc;
 }
 
+void Tachikoma::update_stair_climb(void) {
+  if (!this->finished_unit_motion() && this->climbing = false) {
+    this->climb_state = 0;
+    return;
+  }
+  // define the gait
+  std::vector< std::vector<vec> > initial_gait = {
+    { { -0.5, 0.25 }, { 0.5, 0.5 }, { -0.5, -1.0 }, { 0.5, -0.75 } },
+    { { -0.5, 0.25 }, { 0.5, 0.5 }, { -0.5, -0.5 }, { 0.5, -0.75 } },
+    { { -0.5, 0.75 }, { 0.5, 0.5 }, { -0.5, -0.5 }, { 0.5, -0.75 } },
+    { { -0.5, 0.75 }, { 0.5, 0.5 }, { -0.5, -0.5 }, { 0.5, -0.25 } },
+    { { -0.5, 0.75 }, { 0.5, 1.0 }, { -0.5, -0.5 }, { 0.5, -0.25 } }
+  };
+  // start the gait
+  if (this->climb_state == 0) {
+    this->climbing = true;
+    this->in_state = true;
+    this->climb_state++;
+  } else {
+    // fill these in
+    switch (this->climb_state) {
+      case 1:
+      case 2:
+      case 3:
+      case 4:
+        if (this->finished()) {
+        }
+        break;
+    }
+  }
+  return 0;
+}
+
 /** Update the standing pose
 */
 void tachikoma::update_stand(void) {
@@ -288,46 +321,40 @@ void tachikoma::update_drive(void) {
 
 /** Solve the xyz coordinate of the leg using forward kinematics
 */
-mat Tachikoma::leg_fk_solve(const mat &enc) {
+vec Tachikoma::leg_fk_solve(const vec &enc, int legid) {
   double cosv;
   double sinv;
   double theta;
   double x, y, z;
-  mat pos(3, 4);
 
-  // solve on each leg (using D-H notation)
-  for (int i = 0; i < 4; i++) {
-    // set up reference frame 3
-    x = shin_length;
-    y = 0.0;
-    z = 0.0;
+  // solve leg (using D-H notation)
+  // set up reference frame 3
+  x = shin_length;
+  y = 0.0;
+  z = 0.0;
 
-    // solve for the transformation in refrence frame 2
-    theta = pot2angle(enc(ENC_SHIN, i));
-    cosv = cos(theta);
-    sinv = sin(theta);
-    x = cosv * x + sinv * z + thigh_length;
-    z = -sinv * x + cosv * z;
+  // solve for the transformation in refrence frame 2
+  theta = pot2angle(enc(ENC_SHIN));
+  cosv = cos(theta);
+  sinv = sin(theta);
+  x = cosv * x + sinv * z + thigh_length;
+  z = -sinv * x + cosv * z;
 
-    // solve for the transformation in reference frame 1
-    theta = pot2angle(enc(ENC_THIGH, i));
-    cosv = cos(theta);
-    sinv = sin(theta);
-    x = cosv * x + sinv * z;
-    z = -sinv * x + cosv * z + waist_z;
+  // solve for the transformation in reference frame 1
+  theta = pot2angle(enc(ENC_THIGH));
+  cosv = cos(theta);
+  sinv = sin(theta);
+  x = cosv * x + sinv * z;
+  z = -sinv * x + cosv * z + waist_z;
 
-    // solve for the transformation in reference frame 0
-    theta = pot2angle(enc(ENC_WAIST, i));
-    cosv = cos(theta);
-    sinv = sin(theta);
-    x = cosv * x - sinv * y + waist_x[i];
-    y = sinv * x + cosv * y + waist_y[i];
+  // solve for the transformation in reference frame 0
+  theta = pot2angle(enc(ENC_WAIST));
+  cosv = cos(theta);
+  sinv = sin(theta);
+  x = cosv * x - sinv * y + waist_x[legid];
+  y = sinv * x + cosv * y + waist_y[legid];
 
-    pos(0, i) = x;
-    pos(1, i) = y;
-    pos(2, i) = z;
-  }
-  return pos;
+  return vec({ x, y, z });
 }
 
 /** Solve the encoder values of the legs given a target
