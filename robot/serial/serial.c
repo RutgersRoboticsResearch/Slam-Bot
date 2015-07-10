@@ -143,7 +143,6 @@ static int _serial_setattr(serial_t *connection) {
  *  @note
  *    the packets will be read in the following format:
  *    data\n
- *    however, the \n will be cut off
  */
 static void _serial_update(serial_t *connection) {
   int bytesRead;
@@ -168,8 +167,9 @@ static void _serial_update(serial_t *connection) {
       }
     }
   }
-  if (!connection->connected)
+  if (!connection->connected) {
     return;
+  }
 
   /* update buffer constantly (be careful of overflow!) */
   analyzeBuffer = 0;

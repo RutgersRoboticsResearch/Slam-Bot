@@ -1,7 +1,5 @@
 /****************************************
  *
- * SympleBot
- *
  * The purpose of this program is to do 
  * the following for this particular bot:      
  *
@@ -17,12 +15,8 @@
 #include <ctime>
 #include <unistd.h>
 #include <sys/types.h>
-#include <dirent.h>
-#include <termios.h>
 #include "tbr.h"
 
-#define NUM_DEV       3
-#define DEV_BAUD      B115200
 #define WHEEL_DEVID   1
 #define ARM_DEVID     2
 #define CLAW_DEVID    3
@@ -34,7 +28,6 @@
 #define MOT_RIGHT     1
 #define MOT_ARM       2
 #define MOT_CLAW      3
-#define SYNC_NSEC     100000000
 #define WBUFSIZE      128
 
 using namespace arma;
@@ -43,105 +36,25 @@ static double limitf(double x, double min, double max);
 
 /** Constructor
  */
-TennisBallRobot::TennisBallRobot(void) {
-  this->connect();
+TennisBallRobot::TennisBallRobot(void) : BaseRobot(TENNIS_BALL_ROBOT) {
+  this->prev_motion = zeros<vec>(4);
+  this->motion_const = ones<vec>(4) * 255.0;
+  this->sonar = zeros<vec>(3);
+  this->pot = zeros<vec>(1);
+  if (this->connect()) {
+    this->reset();
+    this->send(zeros<vec>(4));
+  }
 }
 
 /** Destructor
  */
 TennisBallRobot::~TennisBallRobot(void) {
-  this->disconnect();
-}
-
-/** Initialize the communication layer
- *  @return whether or not the robot has connected.
- */
-bool TennisBallRobot::connect(void) {
-  // find all the arduino devices in the device directory
-  DIR *device_dir = opendir("/dev/");
-  struct dirent *entry;
-  // iterate through all the filenames in the directory,
-  // add all the possible connections to the list
-  this->num_possible = 0;
-  while ((entry = readdir(device_dir))) {
-    if (strcmp(entry->d_name, ".") != 0 &&
-        strcmp(entry->d_name, "..") != 0 &&
-        strstr(entry->d_name, "ttyACM")) {
-      char *pport = new char[strlen("/dev/") + strlen(entry->d_name) + 1];
-      sprintf(pport, "/dev/%s", entry->d_name);
-      this->pports.push_back(pport);
-    }
-  }
-  closedir(device_dir);
-  if (this->pports.size() == 0) {
-    this->disconnect();
-    return -1;
-  }
-
-  // when finished adding all the possible filenames,
-  // try to connect to a couple of them (NUM_DEV)
-  // and identify their ids
-  struct timespec synctime;
-  synctime.tv_nsec = SYNC_NSEC % 1000000000;
-  synctime.tv_sec = SYNC_NSEC / 1000000000;
-  for (int i = 0; this->connections.size() < NUM_DEV && i < this->pports.size(); i++) {
-    // connect device
-    serial_t *connection = new serial_t;
-    serial_connect(connection, this->pports[i], DEV_BAUD);
-    if (!connection->connected) {
-      continue;
-    }
-    // read a message
-    char *msg;
-    nanosleep(&synctime, NULL);
-    do  {
-      msg = serial_read(connection);
-    } while (!msg || strlen(msg) == 0);
-    // read another one in case that one was garbage
-    nanosleep(&synctime, NULL);
-    do {
-      msg = serial_read(connection);
-    } while (!msg || strlen(msg) == 0);
-    // debug
-    printf("Message: %s\n", msg);
-    // if a valid device, add as connected, otherwise disconnect
-    int id;
-    sscanf(msg, "[%d ", &id);
-    if (id == WHEEL_DEVID ||
-        id == ARM_DEVID ||
-        id == CLAW_DEVID) {
-      this->connections.push_back(connection);
-      this->ids.push_back(id);
-    } else {
-      serial_disconnect(connection);
-    }
-  }
-
-  // initialize the initial run data
-  this->prev_motion = vec(4);
-  this->motion_const = ones<vec>(4) * 255.0;
-  this->sonar = vec(3);
-  this->pot = vec(1);
-
-  // debug
-  printf("number of devices connected: %d\n", n);
-  // disconnect if number of devices is not enough, or there are too many
-  if (this->connections.size() == 0) {
-    this->disconnect();
-    return false;
-  } else {
-    // reset
+  if (this->connected()) {
+    this->send(zeros<vec>(4));
     this->reset();
-    this->update(zeros<vec>(4));
-    return true;
+    this->disconnect();
   }
-}
-
-/** Get whether or not the robot has connected
- *  @return connection status
- */
-bool TennisBallRobot::connected(void) {
-  return this->connections.size() > 0;
 }
 
 /** Get the number of devices connected
@@ -149,27 +62,6 @@ bool TennisBallRobot::connected(void) {
  */
 int TennisBallRobot::numconnected(void) {
   return this->connections.size();
-}
-
-/** Disconnect everything
- */
-void TennisBallRobot::disconnect(void) {
-  if (this->connections.size() > 0) {
-    this->send(zeros<vec>(this->motion_const.n_elems));
-    for (int i = 0; i < this->connections.size(); i++) {
-      serial_disconnect(this->connections[i]);
-      delete this->connections[i];
-    }
-    this->connections.clear();
-    this->ids.clear();
-  }
-  if (this->pports.size() > 0) {
-    for (int i = 0; i < this->pports.size(); i++) {
-      delete this->pports[i];
-    }
-    this->pports.clear();
-  }
-  this->reset();
 }
 
 /** Reset the robot values
@@ -184,7 +76,7 @@ void TennisBallRobot::reset(void) {
  *  @param motion
  *    the motion vector
  */
-void TennisBallRobot::send(vec motion) {
+void TennisBallRobot::send(const vec &motion) {
   // element match check
   if (motion.n_elem != motion_const.n_elem) {
     motion = zeros<vec>(motion_const.n_elem);
@@ -247,7 +139,7 @@ void TennisBallRobot::send(vec motion) {
 
 /** Receive input from the communication layer
  */
-void TennisBallRobot::recv(void) {
+vec TennisBallRobot::recv(void) {
   char *msg;
   int back_sonar;
   int left_sonar;
@@ -289,6 +181,11 @@ void TennisBallRobot::recv(void) {
     this->sonar[LEFT_SONAR] = 200;
     this->sonar[RIGHT_SONAR] = 200;
   }
+  return vec({
+      this->sonar(LEFT_SONAR),
+      this->sonar(RIGHT_SONAR),
+      this->sonar(BACK_SONAR),
+      this->pot(ARM_POT) });
 }
 
 /** Limit a value between min and max
