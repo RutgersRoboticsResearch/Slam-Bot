@@ -23,7 +23,7 @@
 #include "measurements.h"
 #include "defs.h"
 
-#define WBUFSIZE        128
+#define WBUFSIZE  128
 
 using namespace arma;
 
@@ -40,6 +40,7 @@ Tachikoma::Tachikoma(void) : BaseRobot(TACHIKOMA) {
   this->prev_legval = zeros<mat>(4, 4);
   this->leg_const = ones<mat>(4, 4) * 255.0;
   this->leg_sensors = zeros<mat>(4, 4);
+  this->leg_positions = zeros<mat>(3, 4);
   if (this->connect()) {
     this->reset();
     this->send(zeros<vec>(16));
@@ -64,13 +65,15 @@ int Tachikoma::numconnected(void) {
 }
 
 /** Reset the robot values
-*/
+ */
 void Tachikoma::reset(void) {
   this->prev_legval.zeros();
 }
 
 /** Send output to the communication layer
-*/
+ *  @param motion
+ *    the motion vector to be sent
+ */
 void Tachikoma::send(const vec &motion) {
   if (motion.n_elem != motion_const.n_elem) {
     motion = zeros<vec>(motion_const.n_elem);
@@ -110,7 +113,7 @@ void Tachikoma::send(const vec &motion) {
             motion(wheel_index) == this->prev_motion(wheel_index)) {
           break;
         } else {
-          this->prev_motion(shin_index) = motion(shin_index);
+          this->prev_motion(shin_index)  = motion(shin_index);
           this->prev_motion(wheel_index) = motion(wheel_index);
         }
         sprintf(msg, "[%d %d]\n",
@@ -125,13 +128,16 @@ void Tachikoma::send(const vec &motion) {
 }
 
 /** Receive input from the communication layer
-*/
+ *  @return the sensor vector
+ */
 vec Tachikoma::recv(void) {
   char *msg;
   int waist_pot;
   int thigh_pot;
   int shin_pot;
   int wheel_enc;
+  bool changed = false;
+  bool enc_changed[4] = { false, false, false, false };
   vec enc;
   for (int i = 0; i < this->connections.size(); i++) {
     switch (this->ids[i]) {
@@ -146,7 +152,9 @@ vec Tachikoma::recv(void) {
             &waist_pot, &thigh_pot);
         int leg_index = this->ids[i] - UPPER_DEVID[NW]; // hack for speed
         this->leg_sensors(ENC_WAIST, leg_index) = (double)waist_pot;
-        this->leg_sensors(ENC_THIGHT, leg_index) = (double)thigh_pot;
+        this->leg_sensors(ENC_THIGH, leg_index) = (double)thigh_pot;
+        changed = true;
+        enc_changed[leg_index] = true;
         break;
       case LOWER_DEVID[NW]:
       case LOWER_DEVID[NE]:
@@ -158,169 +166,37 @@ vec Tachikoma::recv(void) {
         sscanf(msg, "[%d %d %d]\n", &this->ids[i],
             &shin_pot, &wheel_enc);
         int leg_index = this->ids[i] - LOWER_DEVID[NW]; // hack for speed
-        this->leg_sensors(ENC_SHIN, leg_index) = (double)shin_pot;
+        this->leg_sensors(ENC_SHIN,  leg_index) = (double)shin_pot;
         this->leg_sensors(ENC_WHEEL, leg_index) = (double)wheel_enc;
+        changed = true;
+        enc_changed[leg_index] = true;
         break;
       default:
         break;
     }
   }
-  enc = vectorise(this->leg_sensors.t());
-  return enc;
-}
-
-void Tachikoma::update_stair_climb(void) {
-  if (!this->finished_unit_motion() && this->climbing = false) {
-    this->climb_state = 0;
-    return;
-  }
-  // define the gait
-  std::vector< std::vector<vec> > initial_gait = {
-    { { -0.5, 0.25 }, { 0.5, 0.5 }, { -0.5, -1.0 }, { 0.5, -0.75 } },
-    { { -0.5, 0.25 }, { 0.5, 0.5 }, { -0.5, -0.5 }, { 0.5, -0.75 } },
-    { { -0.5, 0.75 }, { 0.5, 0.5 }, { -0.5, -0.5 }, { 0.5, -0.75 } },
-    { { -0.5, 0.75 }, { 0.5, 0.5 }, { -0.5, -0.5 }, { 0.5, -0.25 } },
-    { { -0.5, 0.75 }, { 0.5, 1.0 }, { -0.5, -0.5 }, { 0.5, -0.25 } }
-  };
-  // start the gait
-  if (this->climb_state == 0) {
-    this->climbing = true;
-    this->in_state = true;
-    this->climb_state++;
-  } else {
-    // fill these in
-    switch (this->climb_state) {
-      case 1:
-      case 2:
-      case 3:
-      case 4:
-        if (this->finished()) {
-        }
-        break;
+  enc = vec(3);
+  for (int i = 0; i < 4; i++) {
+    if (enc_changed[i]) {
+      enc(ENC_WAIST) = this->leg_sensors(ENC_WAIST, i);
+      enc(ENC_THIGH) = this->leg_sensors(ENC_THIGH, i);
+      enc(ENC_SHIN)  = this->leg_sensors(ENC_SHIN, i);
+      this->leg_positions.col(i) = leg_fk_solve(enc, i);
     }
   }
-  return 0;
-}
-
-/** Update the standing pose
-*/
-void tachikoma::update_stand(void) {
-  const double stand_high_thigh_actuator = 300.0;
-  const double stand_high_shin_actuator = 300.0;
-  const double stand_mid_thigh_actuator = 200.0;
-  const double stand_mid_shin_actuator = 200.0;
-  const double stand_low_thigh_actuator = 100.0;
-  const double stand_low_shin_actuator = 100.0;
-  int i;
-  for (i = 0; i < 4; i++) {
-    if (this->base[1].z > 0.0) {
-      this->target_enc[i](ENCODER_THIGH) = stand_high_thigh_actuator;
-      this->target_enc[i](ENCODER_SHIN) = stand_high_shin_actuator;
-    } else if (this->base[1].z < 0.0) {
-      this->target_enc[i](ENCODER_THIGH) = stand_low_thigh_actuator;
-      this->target_enc[i](ENCODER_SHIN) = stand_low_shin_actuator;
-    } else {
-      this->target_enc[i](ENCODER_THIGH) = stand_mid_thigh_actuator;
-      this->target_enc[i](ENCODER_SHIN) = stand_mid_shin_actuator;
-    }
-    this->legval[i][ENCODER_THIGH] = 0;
-    this->legval[i][ENCODER_SHIN] = 0;
+  if (changed) {
+    this->sensor_vector = vectorise(this->leg_sensors.t());
   }
-}
-
-/** Update the wheels and their poses
-*/
-void tachikoma::update_drive(void) {
-  double angle;
-  arma::vec angles(4);
-  arma::vec enc(4);
-  arma::vec p;
-  //  arma::vec q[4];
-  const int k = 5; // speed factor
-  int i;
-  arma::vec speed(4);
-  arma::vec direction(4);
-  arma::vec turning(4);
-  arma::vec wheel_vel;
-  double vel;
-
-  // TODO: test
-  // Three particular states:
-  // 1) forward motion
-  // 2) sideways motion
-  // 3) everything else
-
-  if (this->base[0].y != 0.0 &&
-      this->base[0].x == 0.0 &&
-      this->base[0].yaw == 0.0) {
-    angle = 0.0;
-    vel = this->base[0].y * 255.0;
-    direction = arma::vec({ -1.0, 1.0, -1.0, 1.0 });
-    wheel_vel = direction * vel;
-    for (i = 0; i < 4; i++) {
-      this->target_enc[i](ENCODER_WAIST) = waist_pot_read_min[i] +
-        rad2enc(angle - waist_pot_min[i]);
-      this->legval[i][0] = k * (int)round(this->target_enc[i](ENCODER_WAIST) -
-          this->curr_enc[i](ENCODER_WAIST));
-      this->wheelval[i][0] = (int)round(wheel_vel(i) * 255.0);
-    }
-  } else if (this->base[0].y == 0.0 &&
-      this->base[0].x != 0.0 &&
-      this->base[0].yaw == 0.0) {
-    angle = M_PI_2;
-    vel = this->base[0].x * 255.0;
-    direction = arma::vec({ -1.0, -1.0, 1.0, 1.0 });
-    wheel_vel = direction * vel;
-    for (i = 0; i < 4; i++) {
-      this->target_enc[i](ENCODER_WAIST) = waist_pot_read_min[i] +
-        rad2enc(angle - waist_pot_min[i]);
-      this->legval[i][0] = k * (int)round(this->target_enc[i](ENCODER_WAIST) -
-          this->curr_enc[i](ENCODER_WAIST));
-      this->wheelval[i][0] = (int)round(wheel_vel(i) * 255.0);
-    }
-  } else {
-    // FOR NOW, DO A SIMPLE IMPLEMENTATION, no speed accimation
-    angle = M_PI_4; // this will have to be calibrated
-    //    p = arma::vec({ this->base[0].x, this->base[0].y });
-    wheel_vel = arma::vec({
-        limitf(-base[0].y - base[0].x + base[0].yaw, -1.0, 1.0),
-        limitf( base[0].y - base[0].x + base[0].yaw, -1.0, 1.0),
-        limitf(-base[0].y + base[0].x + base[0].yaw, -1.0, 1.0),
-        limitf( base[0].y + base[0].x + base[0].yaw, -1.0, 1.0)});
-    for (i = 0; i < 4; i++) {
-      this->target_enc[i](ENCODER_WAIST) = waist_pot_read_min[i] +
-        rad2enc(angle - waist_pot_min[i]);
-      this->legval[i][0] = k * (int)round(this->target_enc[i](ENCODER_WAIST) -
-          this->curr_enc[i](ENCODER_WAIST));
-      this->wheelval[i][0] = (int)round(wheel_vel(i) * 255.0);
-    }
-
-    // place the angle onto the robot's waist motors
-    if (0) {
-      arma::vec q[4];
-      for (i = 0; i < TACHI_NUM_WHEEL_DEV; i++) {
-        this->target_enc[i](ENCODER_WAIST) = rad2enc(angle);
-        // get wheel angles
-        angles(i) = waist_pot_min[i] + enc2rad(-waist_pot_read_min[i] +
-            this->curr_enc[i](ENCODER_WAIST));
-        // move the wheels according the to direction of the current angle, and its normal
-        q[i] = arma::vec({ -sin(angles(i)), cos(angles(i)) });
-        speed(i) = arma::dot(p, q[i]);
-        direction(i) = speed(i) / abs(speed(i));
-        speed(i) = abs(speed(i));
-        turning(i) = base[0].yaw;
-      }
-      // normalize according to the largest speed
-      speed /= arma::max(speed);
-      wheel_vel = speed % direction + turning;
-      for (i = 0; i < TACHI_NUM_WHEEL_DEV; i++) {
-        this->wheelval[i][0] = round(wheel_vel(i) * 255.0);
-      }}
-  }
+  return this->sensor_vector;
 }
 
 /** Solve the xyz coordinate of the leg using forward kinematics
-*/
+ *  @param enc
+ *    the current encoder value vector (waist, thigh, shin)
+ *  @param legid
+ *    the id the leg to solve for
+ *  @return the position vector (x, y, z)
+ */
 vec Tachikoma::leg_fk_solve(const vec &enc, int legid) {
   double cosv;
   double sinv;
@@ -359,34 +235,37 @@ vec Tachikoma::leg_fk_solve(const vec &enc, int legid) {
 
 /** Solve the encoder values of the legs given a target
  *  @param pos
- *    the target vector (x, y, z)
+ *    the target position vector (x, y, z)
+ *  @param enc
+ *    the current encoder value vector (waist, thigh, shin)
+ *  @param legid
+ *    the id the leg to solve for
+ *  @return the differential encoder vector (dx, dy, dz)
  */
-mat tachikoma::leg_ik_solve(const mat &pos, const mat &enc) {
+vec Tachikoma::leg_ik_solve(const vec &pos, const vec &enc, int legid) {
   double x, y, z;
   double W, T, S;
   double r;
-  mat delta(3, 4);
+  vec delta(3);
 
-  for (int i = 0; i < 4; i++) {
-    x = pos(0, i) - waist_x[i];
-    y = pos(1, i) - waist_y[i];
-    z = pos(2, i) - waist_z[i];
+  x = pos(0, i) - waist_x[legid];
+  y = pos(1, i) - waist_y[legid];
+  z = pos(2, i) - waist_z;
 
-    // find the waist angle
-    W = atan2(y, x);
+  // find the waist angle
+  W = atan2(y, x);
 
-    // find the shin angle
-    x = sqrt(x * x + y * y);
-    r = sqrt(x * x + z * z);
-    S = cos_rule_angle(thigh_length, shin_length, r);
+  // find the shin angle
+  x = sqrt(x * x + y * y);
+  r = sqrt(x * x + z * z);
+  S = cos_rule_angle(thigh_length, shin_length, r);
 
-    // find the thigh angle
-    T = cos_rule_angle(thigh_length, r, shin_length) - atan2(z, x);
+  // find the thigh angle
+  T = cos_rule_angle(thigh_length, r, shin_length) - atan2(z, x);
 
-    delta(ENC_WAIST, i) = W - enc(ENC_WAIST, i);
-    delta(ENC_THIGH, i) = T - enc(ENC_THIGH, i);
-    delta(ENC_SHIN, i) = S - enc(ENC_SHIN, i);
-  }
+  delta(ENC_WAIST) = W - enc(ENC_WAIST);
+  delta(ENC_THIGH) = T - enc(ENC_THIGH);
+  delta(ENC_SHIN)  = S - enc(ENC_SHIN);
 
   return delta;
 }
