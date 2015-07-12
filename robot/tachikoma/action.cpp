@@ -1,13 +1,15 @@
 #include <math.h>
-#include "actionstate.h"
+#include "action.h"
 
-static double mag(const arma::vec &v);
+using namespace arma;
+
+static double mag(const vec &v);
 
 /** Constructor
  */
-actionstate::actionstate(void) {
-  this->startPos = arma::vec(4, arma::fill::zeros);
-  this->stopPos = arma::vec(4, arma::fill::zeros);
+ActionState::ActionState(void) {
+  this->startPos = vec(4, fill::zeros);
+  this->stopPos = vec(4, fill::zeros);
   this->motionFcn = (ActionFcn)NULL;
   this->toleranceError = 0.0;
 }
@@ -22,7 +24,7 @@ actionstate::actionstate(void) {
  *  @param tolerance
  *    the tolerance for declaring a state to be finished
  */
-actionstate::actionstate(const arma::vec &start, const arma::vec &stop,
+ActionState::ActionState(const vec &start, const vec &stop,
     ActionFcn motion, double tolerance) {
   this->startPos = start;
   this->stopPos = stop;
@@ -35,11 +37,11 @@ actionstate::actionstate(const arma::vec &start, const arma::vec &stop,
  *    the current position of the vector
  *  @return the weighted interpolation of the error and approxiamation derivative
  */
-arma::vec actionstate::get_motion_vector(const arma::vec &currPos) {
+vec ActionState::get_motion_vector(const vec &currPos) {
   // Use binary approxiamation method to determine the closest point to the function
   double begTime, midTime, endTime;
-  arma::vec begVec, midVec, endVec;
-  arma::vec diff1, diff2;
+  vec begVec, midVec, endVec;
+  vec diff1, diff2;
   double weight1, weight2;
   int i;
 
@@ -47,8 +49,8 @@ arma::vec actionstate::get_motion_vector(const arma::vec &currPos) {
   endTime = 1.0; // this will always be the end time
   begVec = this->startPos;
   endVec = this->stopPos;
-  weight1 = 1.0;
-  weight2 = 1.5;
+  weight1 = 0.4;
+  weight2 = 0.6;
 
   // 10 iterations, 2 ^ 10 samples traversed, 1024 samples traversed
   for (i = 0; i < 10; i++) {
@@ -66,9 +68,9 @@ arma::vec actionstate::get_motion_vector(const arma::vec &currPos) {
   }
 
   // do a weighted calculation for the motion vector
-  diff1 = arma::normalise(endVec - currPos);
-  diff2 = arma::normalise(endVec - begVec);
-  return (diff1 * weight1 + diff2 * weight2) / (weight1 + weight2);
+  diff1 = normalise(endVec - currPos);
+  diff2 = normalise(endVec - begVec);
+  return diff1 * weight1 + diff2 * weight2;
 }
 
 /** Returns whether or not the current action state has finished
@@ -76,7 +78,7 @@ arma::vec actionstate::get_motion_vector(const arma::vec &currPos) {
  *    the current position of the vector
  *  @return true if within tolerance, else false
  */
-bool actionstate::finished(const arma::vec &currPos) {
+bool ActionState::finished(const vec &currPos) {
   return mag(currPos - this->stopPos) < this->toleranceError;
 }
 
@@ -85,7 +87,7 @@ bool actionstate::finished(const arma::vec &currPos) {
  *    the current position of the vector
  *  @return piecewise motion vector
  */
-arma::vec actionsequence::get_motion_vector(const arma::vec &currPos) {
+vec ActionSequence::get_motion_vector(const vec &currPos) {
   if (this->sequence[this->curr_action].finished(currPos)) {
     this->curr_action = (this->curr_action + 1) % this->sequence.size();
   }
@@ -97,13 +99,13 @@ arma::vec actionsequence::get_motion_vector(const arma::vec &currPos) {
  *    the current position of the vector
  *  @return true if finished, else false
  */
-bool actionsequence::finished(const arma::vec &currPos) {
+bool ActionSequence::finished(const vec &currPos) {
   return this->sequence[this->curr_action].finished(currPos);
 }
 
 /** Proceeds to the next action in the sequence
  */
-void actionsequence::next_action(void) {
+void ActionSequence::next_action(void) {
   this->curr_action++;
   this->curr_action %= this->sequence.size();
 }
@@ -112,7 +114,7 @@ void actionsequence::next_action(void) {
  *  @param action
  *    the action to be added to the sequence
  */
-void actionsequence::add_action(const actionstate &action) {
+void ActionSequence::add_action(const ActionState &action) {
   this->sequence.push_back(action);
 }
 
@@ -121,6 +123,6 @@ void actionsequence::add_action(const actionstate &action) {
  *    the vector
  *  @return the magnitude
  */
-static double mag(const arma::vec &v) {
-  return sqrt(arma::dot(v, v));
+static double mag(const vec &v) {
+  return sqrt(dot(v, v));
 }
