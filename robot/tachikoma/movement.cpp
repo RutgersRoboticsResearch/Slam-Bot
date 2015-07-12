@@ -116,13 +116,16 @@ void Tachikoma::update_walk(const vec &v, double w) {
 
 void Tachikoma::update_stair_up(void) {
   this->action_id = ACT_STAIR_UP;
-  for (int i = 0; i < 4; i++) {
-    this->update_forward_step(this->leg_positions(span(0, 2), i),
-        this->leg_positions(span(0, 2), i) +
-        vec({ 0.0, 1.0, 1.0 }), i);
-    while (!action_step_finished);
+  this->action_state_finished = false;
+  ActionNode *action = this->action_tree->select("stair_up_para");
+  if (!action) {
+    return;
   }
-  return 0;
+  this->action_motion = action->get_motion(this->leg_positions);
+  if (action->finished()) {
+    action->next();
+    this->action_state_finished = true;
+  }
 }
 
 void Tachikoma::update_stair_down(void) {
@@ -156,9 +159,74 @@ static double limitf(double value, double min_value, double max_value) {
  */
 void Tachikoma::remember_actions(void) {
   this->action_tree = new ActionNode();
-  this->action_tree->
-    insert("stair_up_para")->insert("NENWSESW")->insert("fwdstepA",
-        new ActionState(zeros<mat>(3, 4), 
+  this->action_tree->insert("stair_up_para")->insert("NWNESWSE")->
+    insert("fwdstepA", new ActionState(reshape(mat({
+        0.3, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0,
+        1.2, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0
+    }), 4, 4).t(), linear_step_fcn));
+  this->action_tree->insert("stair_up_para")->insert("NWNESWSE")->
+    insert("fwdstepB", new ActionState(reshape(mat({
+        0.7, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0,
+        -0.2, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0
+    }), 4, 4).t(), linear_step_fcn));
+  this->action_tree->insert("stair_up_para")->insert("NENWSWSE")->
+    insert("fwdstepA", new ActionState(reshape(mat({
+        0.0, 0.0, 0.3, 0.0,
+        0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 1.2, 0.0,
+        0.0, 0.0, 0.0, 0.0
+    }), 4, 4).t(), linear_step_fcn));
+  this->action_tree->insert("stair_up_para")->insert("NENWSWSE")->
+    insert("fwdstepB", new ActionState(reshape(mat({
+        0.0, 0.0, 0.7, 0.0,
+        0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, -0.2, 0.0,
+        0.0, 0.0, 0.0, 0.0
+    }), 4, 4).t(), linear_step_fcn));
+  this->action_tree->insert("stair_up_para")->insert("NENWSESW")->
+    insert("fwdstepA", new ActionState(reshape(mat({
+        0.0, 0.3, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0,
+        0.0, 1.2, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0
+    }), 4, 4).t(), linear_step_fcn));
+  this->action_tree->insert("stair_up_para")->insert("NENWSESW")->
+    insert("fwdstepB", new ActionState(reshape(mat({
+        0.0, 0.7, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0,
+        0.0, -0.2, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0
+    }), 4, 4).t(), linear_step_fcn));
+  this->action_tree->insert("stair_up_para")->insert("NWNESESW")->
+    insert("fwdstepA", new ActionState(reshape(mat({
+        0.0, 0.0, 0.0, 0.3,
+        0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 1.2,
+        0.0, 0.0, 0.0, 0.0
+    }), 4, 4).t(), linear_step_fcn));
+  this->action_tree->insert("stair_up_para")->insert("NWNESESW")->
+    insert("fwdstepB", new ActionState(reshape(mat({
+        0.0, 0.0, 0.0, 0.7,
+        0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, -0.2,
+        0.0, 0.0, 0.0, 0.0
+    }), 4, 4).t(), linear_step_fcn));
+}
+
+/** load the action space tree
+ */
+void Tachikoma::load_action(const char *name, const char *path) {
+  // this is the better function
+}
+
+/** learn an action based on a video clip
+ */
+void Tachikoma::learn_action(const char *name, mat training_set) {
+}
 }
 
 /** load the action space tree

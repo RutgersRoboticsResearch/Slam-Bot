@@ -72,8 +72,14 @@ void Tachikoma::reset(void) {
 /** Send output to the communication layer
  *  @param motion
  *    the motion vector to be sent
+ *  @note
+ *    there are primarily two fields used for this class:
+ *    - connections
+ *    - ids
+ *    and their respective definitions inside of defs.h
  */
 void Tachikoma::send(const vec &motion) {
+  // set up the motion vector
   if (motion.n_elem != motion_const.n_elem) {
     motion = zeros<vec>(motion_const.n_elem);
   }
@@ -81,6 +87,7 @@ void Tachikoma::send(const vec &motion) {
     motion(i) = limitf(motion(i), -1.0, 1.0);
   }
   motion %= motion_const;
+  // write to device
   char msg[WBUFSIZE];
   for (int i = 0; i < this->connections.size(); i++) {
     switch (this->ids[i]) {
@@ -88,33 +95,31 @@ void Tachikoma::send(const vec &motion) {
       case UPPER_DEVID[NE]:
       case UPPER_DEVID[SW]:
       case UPPER_DEVID[SE]:
-        int waist_index = WAIST_IND[this->ids[i] - UPPER_DEVID[NW]];
-        int thigh_index = THIGH_IND[this->ids[i] - UPPER_DEVID[NW]];
-        if (motion(waist_index) == this->prev_motion(waist_index) &&
-            motion(thigh_index) == this->prev_motion(thigh_index)) {
-          break;
-        } else {
+        int leg_index = this->ids[i] - UPPER_DEVID[NW]; // hack for speed
+        int waist_index = WAIST_IND[leg_index];
+        int thigh_index = THIGH_IND[leg_index];
+        if (motion(waist_index) != this->prev_motion(waist_index) ||
+            motion(thigh_index) != this->prev_motion(thigh_index)) {
           this->prev_motion(waist_index) = motion(waist_index);
           this->prev_motion(thigh_index) = motion(thigh_index);
+          sprintf(msg, "[%d %d]\n", (int)motion(waist_index), (int)motion(thigh_index));
+          serial_write(this->connections[i], msg);
         }
-        sprintf(msg, "[%d %d]\n", (int)motion(waist_index), (int)motion(thigh_index));
-        serial_write(this->connections[i], msg);
         break;
       case LOWER_DEVID[NW]:
       case LOWER_DEVID[NE]:
       case LOWER_DEVID[SW]:
       case LOWER_DEVID[SE]:
-        int shin_index  = SHIN_IND[this->ids[i] - LOWER_DEVID[NW]];
-        int wheel_index = WHEEL_IND[this->ids[i] - LOWER_DEVID[NW]];
-        if (motion(shin_index)  == this->prev_motion(shin_index) &&
-            motion(wheel_index) == this->prev_motion(wheel_index)) {
-          break;
-        } else {
+        int leg_index = this->ids[i] - LOWER_DEVID[NW]; // hack for speed
+        int shin_index  = SHIN_IND[leg_index];
+        int wheel_index = WHEEL_IND[leg_index];
+        if (motion(shin_index)  != this->prev_motion(shin_index) ||
+            motion(wheel_index) != this->prev_motion(wheel_index)) {
           this->prev_motion(shin_index)  = motion(shin_index);
           this->prev_motion(wheel_index) = motion(wheel_index);
+          sprintf(msg, "[%d %d]\n", (int)motion(shin_index), (int)motion(wheel_index));
+          serial_write(this->connections[i], msg);
         }
-        sprintf(msg, "[%d %d]\n", (int)motion(shin_index), (int)motion(wheel_index));
-        serial_write(this->connections[i], msg);
         break;
       default:
         break;
@@ -133,40 +138,40 @@ vec Tachikoma::recv(void) {
   int wheel_enc;
   bool changed = false;
   bool enc_changed[4] = { false, false, false, false };
+  // read from device
   for (int i = 0; i < this->connections.size(); i++) {
     switch (this->ids[i]) {
       case UPPER_DEVID[NW]:
       case UPPER_DEVID[NE]:
       case UPPER_DEVID[SW]:
       case UPPER_DEVID[SE]:
-        if (!(msg = serial_read(this->connections[i]))) {
-          break;
+        if ((msg = serial_read(this->connections[i]))) {
+          sscanf(msg, "[%d %d %d]\n", &this->ids[i], &waist_pot, &thigh_pot);
+          int leg_index = this->ids[i] - UPPER_DEVID[NW]; // hack for speed
+          this->leg_sensors(ENC_WAIST, leg_index) = pot2rad(waist_pot);
+          this->leg_sensors(ENC_THIGH, leg_index) = pot2rad(thigh_pot);
+          changed = true;
+          enc_changed[leg_index] = true;
         }
-        sscanf(msg, "[%d %d %d]\n", &this->ids[i], &waist_pot, &thigh_pot);
-        int leg_index = this->ids[i] - UPPER_DEVID[NW]; // hack for speed
-        this->leg_sensors(ENC_WAIST, leg_index) = pot2rad(waist_pot);
-        this->leg_sensors(ENC_THIGH, leg_index) = pot2rad(thigh_pot);
-        changed = true;
-        enc_changed[leg_index] = true;
         break;
       case LOWER_DEVID[NW]:
       case LOWER_DEVID[NE]:
       case LOWER_DEVID[SW]:
       case LOWER_DEVID[SE]:
-        if (!(msg = serial_read(this->connections[i]))) {
-          break;
+        if ((msg = serial_read(this->connections[i]))) {
+          sscanf(msg, "[%d %d %d]\n", &this->ids[i], &shin_pot, &wheel_enc);
+          int leg_index = this->ids[i] - LOWER_DEVID[NW]; // hack for speed
+          this->leg_sensors(ENC_SHIN,  leg_index) = pot2rad(shin_pot);
+          this->leg_sensors(ENC_WHEEL, leg_index) = enc2rad(wheel_enc);
+          changed = true;
+          enc_changed[leg_index] = true;
         }
-        sscanf(msg, "[%d %d %d]\n", &this->ids[i], &shin_pot, &wheel_enc);
-        int leg_index = this->ids[i] - LOWER_DEVID[NW]; // hack for speed
-        this->leg_sensors(ENC_SHIN,  leg_index) = pot2rad(shin_pot);
-        this->leg_sensors(ENC_WHEEL, leg_index) = enc2rad(wheel_enc);
-        changed = true;
-        enc_changed[leg_index] = true;
         break;
       default:
         break;
     }
   }
+  // update leg positions
   vec enc(3);
   for (int i = 0; i < 4; i++) {
     if (enc_changed[i]) {

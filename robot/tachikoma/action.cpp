@@ -24,10 +24,10 @@ ActionState::ActionState(void) {
  *  @param tolerance
  *    the tolerance for declaring a state to be finished
  */
-ActionState::ActionState(const vec &start, const vec &stop,
+ActionState::ActionState(const vec &v,
     ActionFcn motion, double tolerance) {
-  this->startPos = start;
-  this->stopPos = stop;
+  this->startPos = zeros<vec>(v.n_elem);
+  this->stopPos = v;
   this->motionFcn = motion;
   this->toleranceError = tolerance;
 }
