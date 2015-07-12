@@ -1,4 +1,4 @@
-Note: This particular code for this particular robot is not for the class Software Engineering. The one for Software Engineering is the Tennis Ball Robot. The tachikoma is a robot meant for outside of the class, for RutgersRoboticsResearch the club, under Jonathan Risinger, Gloria Leung, Changling Huang, and Timothy Yong.
+Note: This particular code for this particular robot is not for the class Software Engineering. The one for Software Engineering is the Tennis Ball Robot. The tachikoma is a robot meant for outside of the class, for RutgersRoboticsResearch the club, under Jonathan Risinger, Gloria Leung, Changling Huang, Timothy Yong, and Alexander N.
 
 The robot itself consists of the following movable parts:
 <ol>
