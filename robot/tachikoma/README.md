@@ -2,8 +2,7 @@ Note: This particular code for this particular robot is not for the class Softwa
 
 The robot itself consists of the following movable parts:
 <ol>
-  <li>4 legs which connect to:</li>
-  <li>
+  <li>4 legs which connect to:
     <ul>
       <li>a wheel on the bottom (standard)</li>
       <li>a knee based rotation (pitch)</li>
@@ -11,8 +10,7 @@ The robot itself consists of the following movable parts:
       </li>a base rotation (yaw)</li>
     </ul>
   </li>
-  <li>2 arms which connect to:</li>
-  <li>
+  <li>2 arms which connect to:
     <ul>
       <li>rotational base</li>
       <li>rotational arm</li>
