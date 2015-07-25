@@ -7,6 +7,9 @@
  *     abstracted methods
  *  2) send back sensor map values
  *
+ *  TODO: look into why the some of the
+ *  conversion functions dont work
+ *
  ***************************************/
 
 #include <cstdio>
@@ -20,7 +23,7 @@
 #include <termios.h>
 #include <vector>
 #include "tachikoma.h"
-#include "tachi_defs.h"
+#include "defs.h"
 
 #define WBUFSIZE  128
 
@@ -30,14 +33,19 @@ static int limit(int value, int min_value, int max_value);
 static double limitf(double value, double min_value, double max_value);
 static double cos_rule_angle(double A, double B, double C);
 static double cos_rule_distance(double A, double B, double c);
+static double pot2rad(int reading);
+static int rad2pot(double radians);
+static double enc2rad(int reading);
+static int rad2enc(double radians);
 
 /** CLASS FUNCTIONS **/
 
 /** Constructor
 */
 Tachikoma::Tachikoma(void) : BaseRobot(TACHIKOMA) {
-  this->prev_legval = zeros<mat>(4, 4);
-  this->leg_const = ones<mat>(4, 4) * 255.0;
+  this->prev_motion = zeros<vec>(16);
+  this->motion_const = ones<vec>(16) * 255.0;
+  this->sensor_vector = zeros<vec>(16);
   this->leg_sensors = zeros<mat>(4, 4);
   this->leg_positions = zeros<mat>(3, 4);
   if (this->connect()) {
@@ -66,7 +74,7 @@ int Tachikoma::numconnected(void) {
 /** Reset the robot values
  */
 void Tachikoma::reset(void) {
-  this->prev_legval.zeros();
+  this->prev_motion.zeros();
 }
 
 /** Send output to the communication layer
@@ -79,106 +87,123 @@ void Tachikoma::reset(void) {
  *    and their respective definitions inside of defs.h
  */
 void Tachikoma::send(const vec &motion) {
+  vec new_motion = motion;
   // set up the motion vector
-  if (motion.n_elem != motion_const.n_elem) {
-    motion = zeros<vec>(motion_const.n_elem);
+  if (new_motion.n_elem != motion_const.n_elem) {
+    new_motion = zeros<vec>(motion_const.n_elem);
   }
-  for (int i = 0; i < motion.n_elem; i++) {
-    motion(i) = limitf(motion(i), -1.0, 1.0);
+  for (int i = 0; i < (int)new_motion.n_elem; i++) {
+    new_motion(i) = limitf(new_motion(i), -1.0, 1.0);
   }
-  motion %= motion_const;
+  new_motion %= motion_const;
   // write to device
   char msg[WBUFSIZE];
-  for (int i = 0; i < this->connections.size(); i++) {
-    switch (this->ids[i]) {
-      case UPPER_DEVID[NW]:
-      case UPPER_DEVID[NE]:
-      case UPPER_DEVID[SW]:
-      case UPPER_DEVID[SE]:
-        int leg_index = this->ids[i] - UPPER_DEVID[NW]; // hack for speed
-        int waist_index = WAIST_IND[leg_index];
-        int thigh_index = THIGH_IND[leg_index];
-        if (motion(waist_index) != this->prev_motion(waist_index) ||
-            motion(thigh_index) != this->prev_motion(thigh_index)) {
-          this->prev_motion(waist_index) = motion(waist_index);
-          this->prev_motion(thigh_index) = motion(thigh_index);
-          sprintf(msg, "[%d %d]\n", (int)motion(waist_index), (int)motion(thigh_index));
+  for (int i = 0; i < (int)this->connections.size(); i++) {
+    if (this->ids[i] > 0 && this->ids[i] <= 16) {
+      int devid = this->ids[i];
+      if (devid == WAIST_DEVID[0] || devid == WAIST_DEVID[1]) {
+        int index1 = devid * 2 - 2; // hack for speed
+        int index2 = devid * 2 - 1;
+        if (new_motion(WAIST_ID[index1]) != this->prev_motion(WAIST_ID[index1]) ||
+            new_motion(WAIST_ID[index2]) != this->prev_motion(WAIST_ID[index2])) {
+          this->prev_motion(WAIST_ID[index1]) = new_motion(WAIST_ID[index1]);
+          this->prev_motion(WAIST_ID[index2]) = new_motion(WAIST_ID[index2]);
+          sprintf(msg, "[%d %d]\n",
+              (int)new_motion(WAIST_ID[index1]),
+              (int)new_motion(WAIST_ID[index2]));
           serial_write(this->connections[i], msg);
         }
-        break;
-      case LOWER_DEVID[NW]:
-      case LOWER_DEVID[NE]:
-      case LOWER_DEVID[SW]:
-      case LOWER_DEVID[SE]:
-        int leg_index = this->ids[i] - LOWER_DEVID[NW]; // hack for speed
-        int shin_index  = SHIN_IND[leg_index];
-        int wheel_index = WHEEL_IND[leg_index];
-        if (motion(shin_index)  != this->prev_motion(shin_index) ||
-            motion(wheel_index) != this->prev_motion(wheel_index)) {
-          this->prev_motion(shin_index)  = motion(shin_index);
-          this->prev_motion(wheel_index) = motion(wheel_index);
-          sprintf(msg, "[%d %d]\n", (int)motion(shin_index), (int)motion(wheel_index));
+      } else if (devid == THIGH_DEVID[NW] || devid == THIGH_DEVID[NE] ||
+                 devid == THIGH_DEVID[SW] || devid == THIGH_DEVID[SE]) {
+        int index = devid - THIGH_DEVID[NW]; // hack for speed
+        if (new_motion(THIGH_ID[index]) != this->prev_motion(THIGH_ID[index])) {
+          this->prev_motion(THIGH_ID[index]) = new_motion(THIGH_ID[index]);
+          sprintf(msg, "[%d]\n", (int)new_motion(THIGH_ID[index]));
           serial_write(this->connections[i], msg);
         }
-        break;
-      default:
-        break;
+      } else if (devid == KNEE_DEVID[NW] || devid == KNEE_DEVID[NE] ||
+                 devid == KNEE_DEVID[SW] || devid == KNEE_DEVID[SE]) {
+        int index = devid - KNEE_DEVID[NW]; // hack for speed
+        if (new_motion(KNEE_ID[index]) != this->prev_motion(KNEE_ID[index])) {
+          this->prev_motion(KNEE_ID[index]) = new_motion(KNEE_ID[index]);
+          sprintf(msg, "[%d]\n", (int)new_motion(KNEE_ID[index]));
+          serial_write(this->connections[i], msg);
+        }
+      } else if (devid == WHEEL_DEVID[NW] || devid == WHEEL_DEVID[NE] ||
+                 devid == WHEEL_DEVID[SW] || devid == WHEEL_DEVID[SE]) {
+        int index = devid - WHEEL_DEVID[NW]; // hack for speed
+        if (new_motion(WHEEL_ID[index]) != this->prev_motion(WHEEL_ID[index])) {
+          this->prev_motion(WHEEL_ID[index]) = new_motion(WHEEL_ID[index]);
+          sprintf(msg, "[%d]\n", (int)new_motion(WHEEL_ID[index]));
+          serial_write(this->connections[i], msg);
+        }
+      }
     }
   }
 }
 
 /** Receive input from the communication layer
  *  @return the sensor vector
+ *  TODO: fix me
  */
 vec Tachikoma::recv(void) {
   char *msg;
-  int waist_pot;
-  int thigh_pot;
-  int shin_pot;
-  int wheel_enc;
   bool changed = false;
   bool enc_changed[4] = { false, false, false, false };
   // read from device
-  for (int i = 0; i < this->connections.size(); i++) {
-    switch (this->ids[i]) {
-      case UPPER_DEVID[NW]:
-      case UPPER_DEVID[NE]:
-      case UPPER_DEVID[SW]:
-      case UPPER_DEVID[SE]:
+  for (int i = 0; i < (int)this->connections.size(); i++) {
+    if (this->ids[i] > 0 && this->ids[i] <= 16) {
+      int devid = this->ids[i];
+      if (devid == WAIST_DEVID[0] || devid == WAIST_DEVID[1]) {
         if ((msg = serial_read(this->connections[i]))) {
-          sscanf(msg, "[%d %d %d]\n", &this->ids[i], &waist_pot, &thigh_pot);
-          int leg_index = this->ids[i] - UPPER_DEVID[NW]; // hack for speed
-          this->leg_sensors(ENC_WAIST, leg_index) = pot2rad(waist_pot);
-          this->leg_sensors(ENC_THIGH, leg_index) = pot2rad(thigh_pot);
-          changed = true;
-          enc_changed[leg_index] = true;
+          int index1 = devid * 2 - 2; // hack for speed
+          int index2 = devid * 2 - 1;
+          int pot1;
+          int pot2;
+          sscanf(msg, "[%d %d %d]\n", &this->ids[i], &pot1, &pot2);
+          this->leg_sensors(ENC_WAIST, index1) = pot2rad(pot1);
+          this->leg_sensors(ENC_WAIST, index2) = pot2rad(pot2);
+          enc_changed[index1] = true;
+          enc_changed[index2] = true;
         }
-        break;
-      case LOWER_DEVID[NW]:
-      case LOWER_DEVID[NE]:
-      case LOWER_DEVID[SW]:
-      case LOWER_DEVID[SE]:
+      } else if (devid == THIGH_DEVID[NW] || devid == THIGH_DEVID[NE] ||
+                 devid == THIGH_DEVID[SW] || devid == THIGH_DEVID[SE]) {
         if ((msg = serial_read(this->connections[i]))) {
-          sscanf(msg, "[%d %d %d]\n", &this->ids[i], &shin_pot, &wheel_enc);
-          int leg_index = this->ids[i] - LOWER_DEVID[NW]; // hack for speed
-          this->leg_sensors(ENC_SHIN,  leg_index) = pot2rad(shin_pot);
-          this->leg_sensors(ENC_WHEEL, leg_index) = enc2rad(wheel_enc);
-          changed = true;
-          enc_changed[leg_index] = true;
+          int index = devid - THIGH_DEVID[NW]; // hack for speed
+          int pot;
+          sscanf(msg, "[%d %d]\n", &this->ids[i], &pot);
+          this->leg_sensors(ENC_THIGH, index) = pot2rad(pot);
+          enc_changed[index] = true;
         }
-        break;
-      default:
-        break;
+      } else if (devid == KNEE_DEVID[NW] || devid == KNEE_DEVID[NE] ||
+                 devid == KNEE_DEVID[SW] || devid == KNEE_DEVID[SE]) {
+        if ((msg = serial_read(this->connections[i]))) {
+          int index = devid - KNEE_DEVID[NW]; // hack for speed
+          int pot;
+          sscanf(msg, "[%d %d]\n", &this->ids[i], &pot);
+          this->leg_sensors(ENC_KNEE, index) = pot2rad(pot);
+          enc_changed[index] = true;
+        }
+      } else if (devid == WHEEL_DEVID[NW] || devid == WHEEL_DEVID[NE] ||
+                 devid == WHEEL_DEVID[SW] || devid == WHEEL_DEVID[SE]) {
+        if ((msg = serial_read(this->connections[i]))) {
+          int index = devid - WHEEL_DEVID[NW]; // hack for speed
+          int shaft;
+          sscanf(msg, "[%d %d]\n", &this->ids[i], &shaft);
+          this->leg_sensors(ENC_WHEEL, index) = enc2rad(shaft);
+          enc_changed[index] = true;
+        }
+      }
     }
   }
   // update leg positions
-  vec enc(3);
   for (int i = 0; i < 4; i++) {
     if (enc_changed[i]) {
-      enc(ENC_WAIST) = this->leg_sensors(ENC_WAIST, i);
-      enc(ENC_THIGH) = this->leg_sensors(ENC_THIGH, i);
-      enc(ENC_SHIN)  = this->leg_sensors(ENC_SHIN, i);
-      this->leg_positions.col(i) = leg_fk_solve(enc, i);
+      this->leg_positions.col(i) = this->leg_fk_solve(
+          vec({ this->leg_sensors(ENC_WAIST, i),
+                this->leg_sensors(ENC_THIGH, i),
+                this->leg_sensors(ENC_KNEE, i) }), i);
+      changed = true;
     }
   }
   if (changed) {
@@ -188,8 +213,8 @@ vec Tachikoma::recv(void) {
 }
 
 /** Solve the xyz coordinate of the leg using forward kinematics
- *  @param enc
- *    the current encoder value vector (waist, thigh, shin)
+ *  @param waist, thigh, knee
+ *    the current encoder value vector (waist, thigh, knee)
  *  @param legid
  *    the id the leg to solve for
  *  @return the position vector (x, y, z)
@@ -200,25 +225,29 @@ vec Tachikoma::leg_fk_solve(const vec &enc, int legid) {
 
   // solve leg (using D-H notation)
   // set up reference frame 3
-  double x = shin_length;
+  double x = knee_length;
   double y = 0.0;
   double z = 0.0;
 
+  double waist = enc(ENC_WAIST);
+  double thigh = enc(ENC_THIGH);
+  double knee  = enc(ENC_KNEE);
+
   // solve for the transformation in refrence frame 2
-  cosv = cos(enc(ENC_SHIN));
-  sinv = sin(enc(ENC_SHIN));
+  cosv = cos(knee);
+  sinv = sin(knee);
   x = cosv * x + sinv * z + thigh_length;
   z = -sinv * x + cosv * z;
 
   // solve for the transformation in reference frame 1
-  cosv = cos(enc(ENC_THIGH));
-  sinv = sin(enc(ENC_THIGH));
+  cosv = cos(thigh);
+  sinv = sin(thigh);
   x = cosv * x + sinv * z;
   z = -sinv * x + cosv * z + waist_z;
 
   // solve for the transformation in reference frame 0
-  cosv = cos(enc(ENC_WAIST));
-  sinv = sin(enc(ENC_WAIST));
+  cosv = cos(waist);
+  sinv = sin(waist);
   x = cosv * x - sinv * y + waist_x[legid];
   y = sinv * x + cosv * y + waist_y[legid];
 
@@ -229,7 +258,7 @@ vec Tachikoma::leg_fk_solve(const vec &enc, int legid) {
  *  @param pos
  *    the target position vector (x, y, z)
  *  @param enc
- *    the current encoder value vector (waist, thigh, shin)
+ *    the current encoder value vector (waist, thigh, knee)
  *  @param legid
  *    the id the leg to solve for
  *  @return the differential encoder vector (dx, dy, dz)
@@ -237,20 +266,20 @@ vec Tachikoma::leg_fk_solve(const vec &enc, int legid) {
 vec Tachikoma::leg_ik_solve(const vec &pos, const vec &enc, int legid) {
   vec delta(3);
 
-  double x = pos(0, i) - waist_x[legid];
-  double y = pos(1, i) - waist_y[legid];
-  double z = pos(2, i) - waist_z;
+  double x = pos(0, legid) - waist_x[legid];
+  double y = pos(1, legid) - waist_y[legid];
+  double z = pos(2, legid) - waist_z;
 
   // find the waist angle
   delta(ENC_WAIST) = atan2(y, x) - enc(ENC_WAIST);
 
-  // find the shin angle
+  // find the knee angle
   x = sqrt(x * x + y * y);
   double r = sqrt(x * x + z * z);
-  delta(ENC_SHIN) = cos_rule_angle(thigh_length, shin_length, r) - enc(ENC_SHIN);
+  delta(ENC_KNEE) = cos_rule_angle(thigh_length, knee_length, r) - enc(ENC_KNEE);
 
   // find the thigh angle
-  delta(ENC_THIGH) = cos_rule_angle(thigh_length, r, shin_length) - atan2(z, x) - enc(ENC_THIGH);
+  delta(ENC_THIGH) = cos_rule_angle(thigh_length, r, knee_length) - atan2(z, x) - enc(ENC_THIGH);
 
   return delta;
 }
@@ -321,6 +350,8 @@ static double cos_rule_distance(double A, double B, double c) {
   return sqrt(A * A + B * B - 2.0 * A * B * cos(c));
 }
 
+/** Potentiometer transformation rules
+ */
 static double pot2rad(int reading) {
   return (double)reading;
 }
@@ -329,6 +360,8 @@ static int rad2pot(double radians) {
   return (int)round(radians);
 }
 
+/** Encoder transformation rules
+ */
 static double enc2rad(int reading) {
   return (double)reading * 4.0;
 }
