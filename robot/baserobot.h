@@ -20,7 +20,7 @@ class BaseRobot {
     virtual arma::vec recv(void);
     virtual void reset(void);
 
-  private:
+  protected:
     int robotid;
     std::vector<serial_t *> connections;
     std::vector<int> ids;

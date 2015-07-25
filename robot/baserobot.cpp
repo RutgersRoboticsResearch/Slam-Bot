@@ -5,7 +5,7 @@
 #include <termios.h>
 #include "baserobot.h"
 
-#define DEV_BAUD  B115200
+#define DEV_BAUD  B57600
 #define SYNC_NSEC 100000000
 
 using namespace arma;
@@ -37,12 +37,11 @@ int BaseRobot::id(void) {
  *    will try to connect based on [%d ... \n
  *    if the id <= 0, it will disconnect
  */
-virtual bool BaseRobot::connect(void) {
+bool BaseRobot::connect(void) {
   DIR *device_dir = opendir("/dev/");
   struct dirent *entry;
   // iterate through all the filenames in the directory,
   // add all the possible connections to the list
-  this->num_possible = 0;
   while ((entry = readdir(device_dir))) {
     if (strcmp(entry->d_name, ".") != 0 &&
         strcmp(entry->d_name, "..") != 0 &&
@@ -64,10 +63,10 @@ virtual bool BaseRobot::connect(void) {
   struct timespec synctime;
   synctime.tv_nsec = SYNC_NSEC % 1000000000;
   synctime.tv_sec = SYNC_NSEC / 1000000000;
-  for (int i = 0; this->connections.size() < NUM_DEV && i < this->pports.size(); i++) {
+  for (char *pport : this->pports) {
     // connect device
     serial_t *connection = new serial_t;
-    serial_connect(connection, this->pports[i], DEV_BAUD);
+    serial_connect(connection, pport, DEV_BAUD);
     if (!connection->connected) {
       continue;
     }
@@ -106,25 +105,24 @@ virtual bool BaseRobot::connect(void) {
 /** Default connect detection method
  *  @return true if connected, false otherwise
  */
-virtual bool BaseRobot::connected(void) {
+bool BaseRobot::connected(void) {
   return this->connections.size() > 0;
 }
 
 /** Default disconnect method
  */
-virtual void BaseRobot::disconnect(void) {
+void BaseRobot::disconnect(void) {
   if (this->connections.size() > 0) {
-    this->send(zeros<vec>(this->motion_const.n_elems));
-    for (int i = 0; i < this->connections.size(); i++) {
-      serial_disconnect(this->connections[i]);
-      delete this->connections[i];
+    for (serial_t *connection : this->connections) {
+      serial_disconnect(connection);
+      delete connection;
     }
     this->connections.clear();
     this->ids.clear();
   }
   if (this->pports.size() > 0) {
-    for (int i = 0; i < this->pports.size(); i++) {
-      delete this->pports[i];
+    for (char *pport : this->pports) {
+      delete pport;
     }
     this->pports.clear();
   }
@@ -135,18 +133,18 @@ virtual void BaseRobot::disconnect(void) {
  *  @param motion
  *    the motion vector
  */
-virtual void BaseRobot::send(const vec &motion) {
+void BaseRobot::send(const vec &motion) {
 }
 
 /** Default recv method
  *  @return a vector with no elements
  */
-virtual vec BaseRobot::recv(void) {
+vec BaseRobot::recv(void) {
   vec v;
   return v;
 }
 
 /** Default reset method
  */
-virtual void BaseRobot::reset(void) {
+void BaseRobot::reset(void) {
 }

@@ -1,6 +1,6 @@
-CC = gcc
-CFLAGS = -pedantic -Wall -Werror -std=gnu99 -O3
-INCLUDE = -I$(shell pwd)/../serial
+CC = g++
+CFLAGS = -pedantic -Wall -std=c++11 -O3
+INCLUDE = -I$(shell pwd)/.. -I$(shell pwd)/../serial
 SUBDIRS = $(shell pwd)/../serial
 OBJECTS = tbr.o
 TEST = test.o test
@@ -8,9 +8,10 @@ TEST = test.o test
 all: subdirs $(OBJECTS)
 
 subdirs:
+	make -C $(shell pwd)/.. baserobot.o
 	$(foreach directory, $(SUBDIRS), make -C $(directory);)
 
-tbr.o: tbr.c
+tbr.o: tbr.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) -o $@ -c $<
 
 test.o: test.c

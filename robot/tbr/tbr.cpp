@@ -77,58 +77,59 @@ void TennisBallRobot::reset(void) {
  *    the motion vector
  */
 void TennisBallRobot::send(const vec &motion) {
+  vec new_motion = motion;
   // element match check
-  if (motion.n_elem != motion_const.n_elem) {
-    motion = zeros<vec>(motion_const.n_elem);
+  if (new_motion.n_elem != motion_const.n_elem) {
+    new_motion = zeros<vec>(motion_const.n_elem);
   }
   // software fix for the force feedback
-  if (motion(MOT_LEFT) >= 0.0) {
-    motion(MOT_LEFT) *= 1.15;
+  if (new_motion(MOT_LEFT) >= 0.0) {
+    new_motion(MOT_LEFT) *= 1.15;
   }
-  if (motion(MOT_RIGHT) >= 0.0) {
-    motion(MOT_RIGHT) *= 1.15;
+  if (new_motion(MOT_RIGHT) >= 0.0) {
+    new_motion(MOT_RIGHT) *= 1.15;
   }
   // boundary check
-  for (int i = 0; i < motion.n_elem; i++) {
-    motion(i) = limitf(motion(i), -1.0, 1.0);
+  for (int i = 0; i < (int)new_motion.n_elem; i++) {
+    new_motion(i) = limitf(new_motion(i), -1.0, 1.0);
   }
   // amplitude factor
-  motion %= motion_const;
+  new_motion %= motion_const;
   // send the values to the arduinos
   char msg[WBUFSIZE];
-  for (int i = 0; i < this->num_connected; i++) {
+  for (int i = 0; i < (int)this->connections.size(); i++) {
     switch (this->ids[i]) {
       case WHEEL_DEVID:
-        if (motion(MOT_LEFT)  == this->prev_motion(MOT_LEFT) &&
-            motion(MOT_RIGHT) == this->prev_motion(MOT_RIGHT)) {
+        if (new_motion(MOT_LEFT)  == this->prev_motion(MOT_LEFT) &&
+            new_motion(MOT_RIGHT) == this->prev_motion(MOT_RIGHT)) {
           break;
         } else {
-          this->prev_motion(MOT_LEFT)  = motion(MOT_LEFT);
-          this->prev_motion(MOT_RIGHT) = motion(MOT_RIGHT);
+          this->prev_motion(MOT_LEFT)  = new_motion(MOT_LEFT);
+          this->prev_motion(MOT_RIGHT) = new_motion(MOT_RIGHT);
         }
         sprintf(msg, "[%d %d]\n",
-            (int)motion(MOT_LEFT),
-            (int)motion(MOT_RIGHT));
+            (int)new_motion(MOT_LEFT),
+            (int)new_motion(MOT_RIGHT));
         serial_write(this->connections[i], msg);
         break;
       case ARM_DEVID:
-        if (motion(MOT_ARM) == this->prev_motion(MOT_ARM)) {
+        if (new_motion(MOT_ARM) == this->prev_motion(MOT_ARM)) {
           break;
         } else {
-          this->prev_motion(MOT_ARM) = motion(MOT_ARM);
+          this->prev_motion(MOT_ARM) = new_motion(MOT_ARM);
         }
         sprintf(msg, "[%d]\n",
-            (int)motion(MOT_ARM));
+            (int)new_motion(MOT_ARM));
         serial_write(this->connections[i], msg);
         break;
       case CLAW_DEVID:
-        if (motion(MOT_CLAW) == this->prev_motion(MOT_CLAW)) {
+        if (new_motion(MOT_CLAW) == this->prev_motion(MOT_CLAW)) {
           break;
         } else {
-          this->prev_motion(MOT_CLAW) = motion(MOT_CLAW);
+          this->prev_motion(MOT_CLAW) = new_motion(MOT_CLAW);
         }
         sprintf(msg, "[%d]\n",
-            (int)motion(MOT_CLAW));
+            (int)new_motion(MOT_CLAW));
         serial_write(this->connections[i], msg);
         break;
       default:
@@ -145,7 +146,7 @@ vec TennisBallRobot::recv(void) {
   int left_sonar;
   int right_sonar;
   int arm_pot;
-  for (int i = 0; i < this->connections.size(); i++) {
+  for (int i = 0; i < (int)this->connections.size(); i++) {
     switch (this->ids[i]) {
       case WHEEL_DEVID:
         if (!(msg = serial_read(this->connections[i]))) {

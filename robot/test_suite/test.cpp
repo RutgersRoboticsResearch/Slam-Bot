@@ -1,11 +1,15 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <cstring>
 #include <signal.h>
+#include <time.h>
 #include "serial.h"
 #include "xboxctrl.h"
 
 static int stopping;
+
+#define SYNC_NSEC 100000000
 
 void stopme(int signo) {
   stopping = 1;
@@ -18,13 +22,23 @@ class TestOutput {
     TestOutput(void) {
       char *msg;
       int id;
+      struct timespec synctime;
       serial_connect(&this->connection, NULL, 57600);
       if (!this->connection.connected) {
         printf("Not able to connect to leg\n");
         return;
       }
-      while (!(msg = serial_read(&this->connection))) ;
-      while (!(msg = serial_read(&this->connection))) ;
+      // read a msg
+      synctime.tv_nsec = SYNC_NSEC % 1000000000;
+      synctime.tv_sec = SYNC_NSEC / 1000000000;
+      nanosleep(&synctime, NULL);
+      do  {
+        msg = serial_read(&this->connection);
+      } while (!msg || strlen(msg) == 0);
+      nanosleep(&synctime, NULL);
+      do  {
+        msg = serial_read(&this->connection);
+      } while (!msg || strlen(msg) == 0);
       sscanf(msg, "[%d ", &id);
       if (!id) {
         printf("Error reading from the leg\n");
