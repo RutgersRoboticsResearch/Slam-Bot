@@ -1,5 +1,5 @@
-#ifndef __SB_KINECT_H__
-#define __SB_KINECT_H__
+#ifndef __TK_KINECT_H__
+#define __TK_KINECT_H__
 
 #include <cstdint>
 #include <vector>

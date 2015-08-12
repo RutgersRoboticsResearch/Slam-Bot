@@ -1,5 +1,5 @@
-#ifndef __SB_VISUAL_H__
-#define __SB_VISUAL_H__
+#ifndef __TK_VISUAL_H__
+#define __TK_VISUAL_H__
 
 #include <armadillo>
 

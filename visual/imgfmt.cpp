@@ -7,6 +7,9 @@ static int limit(int x, int minv, int maxv);
 
 arma::cube load_image(const std::string &image_name) {
   cv::Mat cv_image = cv::imread(image_name.c_str(), CV_LOAD_IMAGE_COLOR);
+  if (!cv_image.data) {
+    printf("Warning: No image data!\n");
+  }
   return cvt_opencv2arma(cv_image) / 255.0;
 }
 
@@ -14,15 +17,15 @@ arma::cube cvt_opencv2arma(const cv::Mat &cv_image) {
   arma::cube image(cv_image.rows, cv_image.cols, cv_image.channels());
   switch (image.n_slices) {
     case 1:
-      for (int i = 0; i < image.n_rows; i++) {
-        for (int j = 0; j < image.n_cols; j++) {
+      for (arma::uword i = 0; i < image.n_rows; i++) {
+        for (arma::uword j = 0; j < image.n_cols; j++) {
           image(i, j, 0) = (double)(cv_image.at<uint8_t>(i, j));
         }
       }
       break;
     case 3:
-      for (int i = 0; i < image.n_rows; i++) {
-        for (int j = 0; j < image.n_cols; j++) {
+      for (arma::uword i = 0; i < image.n_rows; i++) {
+        for (arma::uword j = 0; j < image.n_cols; j++) {
           // set the red pixel
           image(i, j, 0) = (double)(cv_image.at<cv::Vec3b>(i, j)[2]);
           // set the green pixel
@@ -33,8 +36,8 @@ arma::cube cvt_opencv2arma(const cv::Mat &cv_image) {
       }
       break;
     case 4:
-      for (int i = 0; i < image.n_rows; i++) {
-        for (int j = 0; j < image.n_cols; j++) {
+      for (arma::uword i = 0; i < image.n_rows; i++) {
+        for (arma::uword j = 0; j < image.n_cols; j++) {
           // set the red pixel
           image(i, j, 0) = (double)(cv_image.at<cv::Vec4b>(i, j)[2]);
           // set the green pixel
@@ -53,9 +56,31 @@ arma::cube cvt_opencv2arma(const cv::Mat &cv_image) {
   return image;
 }
 
+/* put later when GPU gets going
+SDL_Surface *cvt_opencv2sdl(const cv::Mat &cv_image) {
+  SDL_Surface *surface = SDL_CreateRGBSurface(0,
+      cv_image.cols, cv_image.rows, cv_image.channels(), 0, 0, 0, 0);
+  for (int i = 0; i < cv_image.rows; i++) {
+    for (int j = 0; j < cv_image.cols; j++) {
+      uint32_t *pixel = &(((uint32_t *)surface->pixels)[SDL2F(
+    }
+  }
+}
+*/
+
+void disp_image(const std::string &window_name, const arma::mat &image) {
+  cv::namedWindow(window_name);
+  arma::cube new_image = cvt_gray2rgb(image);
+  cv::imshow(window_name, cvt_arma2opencv(new_image * 255.0));
+}
+
 void disp_image(const std::string &window_name, const arma::cube &image) {
-  cv::namedWindow(window_name.c_str());
-  cv::imshow(window_name.c_str(), cvt_arma2opencv(image * 255.0));
+  cv::namedWindow(window_name);
+  cv::imshow(window_name, cvt_arma2opencv(image * 255.0));
+}
+
+void disp_wait(void) {
+  cv::waitKey(0);
 }
 
 cv::Mat cvt_arma2opencv(const arma::cube &image) {
@@ -63,33 +88,33 @@ cv::Mat cvt_arma2opencv(const arma::cube &image) {
   switch (image.n_slices) {
     case 1:
       cv_image = cv::Mat(image.n_rows, image.n_cols, CV_8UC1);
-      for (int i = 0; i < image.n_rows; i++) {
-        for (int j = 0; j < image.n_cols; j++) {
-          int gray = limit((int)round(image(i, j, 0)), 0, 255);
+      for (arma::uword i = 0; i < image.n_rows; i++) {
+        for (arma::uword j = 0; j < image.n_cols; j++) {
+          uint8_t gray = (uint8_t)limit((int)round(image(i, j, 0)), 0, 255);
           cv_image.at<uint8_t>(i, j) = gray;
         }
       }
       break;
     case 3:
       cv_image = cv::Mat(image.n_rows, image.n_cols, CV_8UC3);
-      for (int i = 0; i < image.n_rows; i++) {
-        for (int j = 0; j < image.n_cols; j++) {
-          int red   = limit((int)round(image(i, j, 0)), 0, 255);
-          int green = limit((int)round(image(i, j, 1)), 0, 255);
-          int blue  = limit((int)round(image(i, j, 2)), 0, 255);
+      for (arma::uword i = 0; i < image.n_rows; i++) {
+        for (arma::uword j = 0; j < image.n_cols; j++) {
+          uint8_t red   = (uint8_t)limit((int)round(image(i, j, 0)), 0, 255);
+          uint8_t green = (uint8_t)limit((int)round(image(i, j, 1)), 0, 255);
+          uint8_t blue  = (uint8_t)limit((int)round(image(i, j, 2)), 0, 255);
           cv_image.at<cv::Vec3b>(i, j) = cv::Vec3b(blue, green, red);
         }
       }
       break;
     case 4:
       cv_image = cv::Mat(image.n_rows, image.n_cols, CV_8UC4);
-      for (int i = 0; i < image.n_rows; i++) {
-        for (int j = 0; j < image.n_cols; j++) {
-          int red   = limit((int)round(image(i, j, 0)), 0, 255);
-          int green = limit((int)round(image(i, j, 1)), 0, 255);
-          int blue  = limit((int)round(image(i, j, 2)), 0, 255);
-          int alpha = limit((int)round(image(i, j, 3)), 0, 255);
-          cv_image.at<cv::Vec3b>(i, j) = cv::Vec4b(blue, green, red, alpha);
+      for (arma::uword i = 0; i < image.n_rows; i++) {
+        for (arma::uword j = 0; j < image.n_cols; j++) {
+          uint8_t red   = (uint8_t)limit((int)round(image(i, j, 0)), 0, 255);
+          uint8_t green = (uint8_t)limit((int)round(image(i, j, 1)), 0, 255);
+          uint8_t blue  = (uint8_t)limit((int)round(image(i, j, 2)), 0, 255);
+          uint8_t alpha = (uint8_t)limit((int)round(image(i, j, 3)), 0, 255);
+          cv_image.at<cv::Vec4b>(i, j) = cv::Vec4b(blue, green, red, alpha);
         }
       }
       break;
@@ -102,4 +127,21 @@ cv::Mat cvt_arma2opencv(const arma::cube &image) {
 
 static int limit(int x, int minv, int maxv) {
   return (x < minv) ? minv : ((x > maxv) ? maxv : x);
+}
+
+arma::mat cvt_rgb2gray(const arma::cube &image) {
+  arma::vec scale = { 0.3, 0.6, 0.1 };
+  arma::mat new_image = arma::zeros<arma::mat>(image.n_rows, image.n_cols);
+  for (arma::uword i = 0; i < image.n_slices; i++) {
+    new_image += scale(i) * image.slice(i); // weighted construction
+  }
+  return new_image;
+}
+
+arma::cube cvt_gray2rgb(const arma::mat &image) {
+  arma::cube new_image(image.n_rows, image.n_cols, 3);
+  for (arma::uword i = 0; i < new_image.n_slices; i++) {
+    new_image.slice(i) = image;
+  }
+  return new_image;
 }

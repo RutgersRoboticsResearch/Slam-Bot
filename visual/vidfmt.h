@@ -1,5 +1,5 @@
-#ifndef __SB_VIDFMT_H__
-#define __SB_VIDFMT_H__
+#ifndef __TK_VIDFMT_H__
+#define __TK_VIDFMT_H__
 
 #include <armadillo>
 
