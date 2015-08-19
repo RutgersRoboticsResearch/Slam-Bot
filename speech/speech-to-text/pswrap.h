@@ -1,5 +1,5 @@
-#ifndef __SB_PSWRAP_H__
-#define __SB_PSWRAP_H__
+#ifndef __TK_PSWRAP_H__
+#define __TK_PSWRAP_H__
 
 #include <pocketsphinx.h>
 

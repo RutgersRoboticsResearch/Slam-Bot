@@ -9,6 +9,7 @@
 class Particle {
   public:
     arma::vec pose;
+    arma::vec sigma;
     double health;
 
     Particle(double px, double py, double ang, double hp);
@@ -38,8 +39,8 @@ class ParticleFilter {
     GridMap &world;
     
     std::vector<Particle> particles;
-    std::vector<arma::vec> latestobs;
-    struct timeval obstimestamp;
+//    std::vector<arma::vec> latestobs;
+//    struct timeval obstimestamp;
     
     double weight(const Particle &p);
     void resample(void);

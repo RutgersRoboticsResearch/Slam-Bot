@@ -203,7 +203,7 @@ static void gridnode_store(gridnode_t *node, char *foldername, FILE *infofile) {
   sprintf(filename, "%s/L%dR%dD%dU%d.txt", foldername,
       node->min_x, node->max_x, node->min_y, node->max_y);
   datafd = open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-  write(datafd, (void *)node->map, sizeof(int) * node->n_rows * node->n_cols);
+  write(datafd, (void *)node->map, sizeof(uint8_t) * node->n_rows * node->n_cols);
   close(datafd);
   // write to an image
   image = SDL_CreateRGBSurface(0, node->n_rows, node->n_cols, 32, 0, 0, 0, 0);

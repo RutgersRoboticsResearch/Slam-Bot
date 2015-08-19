@@ -1,5 +1,5 @@
-#ifndef __SB_HTTPLINK_H__
-#define __SB_HTTPLINK_H__
+#ifndef __TK_HTTPLINK_H__
+#define __TK_HTTPLINK_H__
 
 #ifdef __cplusplus
 extern "C" {

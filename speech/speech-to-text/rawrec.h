@@ -1,5 +1,5 @@
-#ifndef __SB_RAWREC_H__
-#define __SB_RAWREC_H__
+#ifndef __TK_RAWREC_H__
+#define __TK_RAWREC_H__
 
 #ifdef __cplusplus
 extern "C" {

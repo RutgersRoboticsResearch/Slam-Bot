@@ -1,5 +1,5 @@
-#ifndef __SB_LIDAR_H__
-#define __SB_LIDAR_H__
+#ifndef __TK_LIDAR_H__
+#define __TK_LIDAR_H__
 
 #include <string>
 #include <vector>

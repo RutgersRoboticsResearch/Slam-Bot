@@ -111,9 +111,9 @@ mat laplace_gauss2(uword n, double sigma2) {
 }
 
 // try to get adaptive thresholding working
-mat edge2(const mat &F, uword n, bool isSobel, bool isDoG) {
+mat edge2(const mat &F, uword n, double sigma2, bool isSobel, bool isDoG) {
   if (isSobel) {
-    mat G = gauss2(n, sqrt(n) / 2.0);
+    mat G = gauss2(n, sigma2);
     // smooth first
     mat H = conv2(F, G);
     vector<mat> dxdy = gradient2(H);
@@ -122,18 +122,18 @@ mat edge2(const mat &F, uword n, bool isSobel, bool isDoG) {
     G = sqrt(X % X + Y % Y);
     return G;
   } else if (isDoG) {
-    mat G = gauss2(n, sqrt(n) / 2.0);
+    mat G = gauss2(n, sigma2);
     mat DoG = conv2(F, G) - F;
     return DoG;
   } else {
-    mat LoG = laplace_gauss2(n, sqrt(n) / 2.0);
+    mat LoG = laplace_gauss2(n, sigma2);
     mat G = conv2(F, LoG);
     return G;
   }
 }
 
-mat edge2rgb(const cube &F, uword n) {
-  return edge2(cvt_rgb2gray(F), n);
+mat edge2rgb(const cube &F, uword n, double sigma2) {
+  return edge2(cvt_rgb2gray(F), n, sigma2);
 }
 
 vector<mat> gradient2(const mat &F) {
@@ -164,13 +164,12 @@ vector<cube> gradient2rgb(const cube &F) {
   return g;
 }
 
-mat nmm_suppress(const mat &F) {
+mat nmm2(const mat &F) {
   mat A(F.n_rows + 2, F.n_cols + 2, fill::zeros);
   A(span(1, F.n_rows), span(1, F.n_cols)) = F;
   mat G(F.n_rows, F.n_cols);
   for (uword i = 0; i < F.n_rows; i++) {
     for (uword j = 0; j < F.n_cols; j++) {
-      // four directions
       G(i, j) = 0.0;
       if (((A(i+1,j+1)-A(i+1,j)) * (A(i+1,j+1)-A(i+1,j+2)) >= 0.0) ||
           ((A(i+1,j+1)-A(i,j+1)) * (A(i+1,j+1)-A(i+2,j+1)) >= 0.0)) {
@@ -302,20 +301,169 @@ cube hist_segment2rgb(const cube &F, uword k) {
   return C;
 }
 
-double sad(const mat &I1, const mat &I2) {
+double sad2(const mat &I1, const mat &I2) {
   return accu(abs(I1 - I2));
 }
 
-double ssd(const mat &I1, const mat &I2) {
+double ssd2(const mat &I1, const mat &I2) {
   mat C = I1 - I2;
   return accu(C % C);
 }
 
-double ncc(const mat &I1, const mat &I2) {
+double ncc2(const mat &I1, const mat &I2) {
   assert(I1.n_rows == I2.n_rows && I1.n_cols == I2.n_cols);
   double mu1 = accu(I1) / (double)(I1.n_rows * I1.n_cols);
   double mu2 = accu(I2) / (double)(I1.n_rows * I1.n_cols);
   mat F = I1 - mu1;
   mat G = I2 - mu2;
-  return accu(F % G) / (accu(F)*accu(G));
+  return accu(F % G) / (accu(F) * accu(G));
+}
+
+mat harris2(const mat &I, const mat &W) {
+  assert(W.n_rows == W.n_cols);
+  std::vector<mat> G = gradient2(I); // grab the gradients
+  // place gradients into padded matrix
+  mat Ixx(I.n_rows+W.n_rows-1, I.n_cols+W.n_cols-1, fill::zeros);
+  mat Ixy(I.n_rows+W.n_rows-1, I.n_cols+W.n_cols-1, fill::zeros);
+  mat Iyy(I.n_rows+W.n_rows-1, I.n_cols+W.n_cols-1, fill::zeros);
+  uword a = W.n_rows / 2;
+  uword b = W.n_cols / 2;
+  Ixx(span(a,I.n_rows+a-1), span(b,I.n_cols+b-1)) = G[0] % G[0];
+  Ixy(span(a,I.n_rows+a-1), span(b,I.n_cols+b-1)) = G[0] % G[1];
+  Iyy(span(a,I.n_rows+a-1), span(b,I.n_cols+b-1)) = G[1] % G[1];
+  // set up a corner matrix
+  mat H(I.n_rows, I.n_cols);
+  // find the taylor expansion-based corner detector
+  for (uword i = 0; i < I.n_rows; i++) {
+    for (uword j = 0; j < I.n_cols; j++) {
+      // create a jacobian (first order taylor expansion)
+      double wIxx = accu(conv2(W, Ixx(span(i,i+W.n_rows-1), span(j,j+W.n_cols-1))));
+      double wIxy = accu(conv2(W, Ixy(span(i,i+W.n_rows-1), span(j,j+W.n_cols-1))));
+      double wIyy = accu(conv2(W, Iyy(span(i,i+W.n_rows-1), span(j,j+W.n_cols-1))));
+      mat A = reshape(mat({
+        wIxx, wIxy,
+        wIxy, wIyy
+      }), 2, 2);
+      // use harris response for eigenvalue representation
+      double k = 0.1;
+      double R = det(A) - k * (trace(A) * trace(A));
+      // normalize it? maybe later...
+      H(i, j) = R;
+    }
+  }
+  return H;
+}
+
+static vec mergesort(const vec &nums) {
+  if (nums.size() == 1) {
+    return nums;
+  }
+  vec a = mergesort(nums(span(0, nums.n_elem/2-1)));
+  vec b = mergesort(nums(span(nums.n_elem/2, nums.n_elem-1)));
+  uword i = 0, j = 0, k = 0;
+  vec c(nums.n_elem, fill::zeros);
+  while (k < c.n_elem) {
+    if (i == a.n_elem) {
+      c(k) = b(j); j++; k++;
+    } else if (j == b.n_elem || a(i) < b(j)) {
+      c(k) = a(i); i++; k++;
+    } else {
+      c(k) = b(j); j++; k++;
+    }
+  }
+  return c;
+}
+
+static double median_of_medians(const vec &nums) {
+  vec tnums = nums;
+  while (tnums.n_rows >= 15) {
+    vec new_nums = vec((uword)ceil((double)tnums.n_elem / 5.0));
+    for (uword i = 0; i < new_nums.n_elem; i++) {
+      uword left = i * 5;
+      uword right = (i + 1) * 5;
+      if (right > tnums.n_elem) {
+        right = tnums.n_elem;
+      }
+      vec S = mergesort(tnums(span(left, right - 1)));
+      new_nums(i) = S(S.n_elem / 2);
+    }
+    tnums = new_nums;
+  }
+  vec S = mergesort(tnums);
+  return S(S.n_elem / 2);
+}
+
+mat medfilt2(const mat &F, uword k) {
+  uword mid = k / 2;
+  mat G(F.n_rows, F.n_cols);
+
+  mat A(F.n_rows+k-1, F.n_cols+k-1, fill::zeros);
+  A(span(mid, F.n_rows+mid-1), span(mid, F.n_cols+mid-1)) = F;
+
+  for (uword i = 0; i < F.n_rows; i++) {
+    for (uword j = 0; j < F.n_cols; j++) {
+      mat C = A(span(i, i+k-1), span(j, j+k-1));
+      G(i, j) = median_of_medians(vectorise(C));
+    }
+  }
+  return G;
+}
+
+mat imresize2(const mat &A, uword m, uword n) {
+  mat G(m, n);
+  double kr = (double)A.n_rows / (double)m;
+  double kc = (double)A.n_cols / (double)n;
+  // then do bilinear interpolation (better with a kernel, but whatever)
+  for (uword i = 0; i < m; i++) {
+    for (uword  j = 0; j < n; j++) {
+      double ia = (double)(i) * kr;
+      double ib = (double)(i+1) * kr;
+      double ja = (double)(j) * kc;
+      double jb = (double)(j+1) * kc;
+      uword mini = MIN((uword)floor(ia), 0);
+      uword maxi = MAX((uword)ceil(ib), A.n_rows);
+      uword minj = MIN((uword)floor(ja), 0);
+      uword maxj = MAX((uword)ceil(jb), A.n_cols);
+      mat P = A(span(mini, maxi-1), span(minj, maxj-1));
+      
+      G(i, j) = (A(mini,minj)*((double)maxi-ni)+A(maxi,minj)*(ni-(double)mini))*((double)maxj-nj) +
+        (A(mini,maxj)*((double)maxi-ni)+A(maxi,maxj)*(ni-(double)mini))*(nj-(double)minj);
+    }
+  }
+  return G;
+}
+
+vector<mat> laplace_pyramid2(const mat &H) {
+  uword row_size = H.n_rows;
+  uword col_size = H.n_cols;
+  vector<mat> P;
+  mat S = H;
+  P.push_back(S);
+  while (row_size > 1 && col_size > 1) {
+    row_size = row_size / 2;
+    col_size = col_size / 2;
+    S = imresize2(S, row_size, col_size);
+    P.push_back(S);
+  }
+  return P;
+}
+
+mat laplace_restore(const vector<mat> &P) {
+  return P[0];
+}
+
+mat sift(const mat &H) {
+  // step one: create the laplacian pyramid of multiple scalings
+  vector<mat> P = laplace_pyramid2(H);
+  mat G[7][10]; // create 10 different gaussian scalings, restrict pyramid resize to 7
+  for (int s = 0; s < 10; s++) {
+    G[0][s] = P[s];
+  }
+  for (int n = 0; n < 7; n++) {
+    for (int s = 1; s < 10; s++) {
+      G[n][s] = (conv2(P[s], gauss2((uword)((1<<(9-n))+1), (double)(s+1)/2.0)));
+    }
+  }
+  // step two: create a gradient scale between all laplacian pyramid sizes
+  return H;
 }

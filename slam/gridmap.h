@@ -1,5 +1,5 @@
-#ifndef __SB_GRIDMAP_H__
-#define __SB_GRIDMAP_H__
+#ifndef __TK_GRIDMAP_H__
+#define __TK_GRIDMAP_H__
 
 #include <stdint.h>
 

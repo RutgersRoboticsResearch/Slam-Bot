@@ -1,7 +1,6 @@
 #include <iostream>
 #include <cstdio>
 #include <cmath>
-#include <array>
 #include <unistd.h>
 #include <cstdlib>
 #include "particlefilter.h"
@@ -13,7 +12,7 @@ const double var_angle = 0.0;
 static double UniformPDF ( void );
 static mat gauss2( int window_size, double sigma );
 
-static double UniformPDF ( void ) 
+static double UniformPDF ( void )
 { 
   return ( double )rand() / ( double ) RAND_MAX; 
 }
@@ -27,17 +26,19 @@ static double intpow(double x, double n) {
 }
 
 static double erfinv(double p) {
-// approximate maclaurin series (refer to http://mathworld.wolfram.com/InverseErf.html)
-  p *= sqrt(M_PI) / 2.0;
-  vec a = { 1.0,
-  0.333333333333,
-  0.233333333333,
-  0.201587301587,
-  0.192636684303,
-  0.195325476992,
-  0.205935864547,
-  0.223209757419 }
+  // approximate maclaurin series (refer to http://mathworld.wolfram.com/InverseErf.html)
+  vec a = {
+    1.0,
+    0.333333333333,
+    0.233333333333,
+    0.201587301587,
+    0.192636684303,
+    0.195325476992,
+    0.205935864547,
+    0.223209757419
+  };
   vec x(a.n_elems);
+  p *= sqrt(M_PI) / 2.0;
   for (int i = 0; i < x.n_elems; i++) {
     x(i) = intpow(p, 2 * i + 1);
   }
@@ -48,8 +49,8 @@ static double limitf(int v, int x1, int x2) {
   return (v > x2) ? x2 : ((v < x1) ? x1 : v);
 }
 
-static double InverseGaussCDF( double p ) {
-  return limitf((2.0 + erfinv(p * 2.0 - 1.0)) / 4.0, 0.0, 1.0);
+static double InverseGaussCDF( double p, double sigma) {
+  return limitf(erfinv(p * 2.0 - 1.0) / 2.0, -1.0, 1.0) * sigma;
 }
 
 static mat Gauss2Kernel(int window_size, double sigma) {
@@ -75,18 +76,18 @@ ParticleFilter::ParticleFilter(GridMap &map, vec hyp_location, int nparticles) :
   struct timeval t;
   gettimeofday( &t, NULL );
   srand( ( unsigned int )( t.tv_sec * 1000000 + t.tv_usec ) +
-         ( unsigned int ) getpid());
+      ( unsigned int ) getpid());
 
   // create a new vector of particles 
   for ( int i = 0; i < nparticles; i++ ) {
     // use the inverse CDF of the gauss function to select the x and y with a gauss relationship
     double spread = 20.0;
     this->particles.push_back(
-      Particle( ( InverseGaussCDF(UniformPDF()) * spread - (spread / 2.0) + hyp_location(0) )
-      ,         ( InverseGaussCDF(UniformPDF()) * spread - (spread / 2.0) + hyp_location(1) )
-      ,         ( UniformPDF() * 2.0 * M_PI )
-      ,         1.0
-      ) );
+        Particle( ( InverseGaussCDF(UniformPDF(), spread) + hyp_location(0) )
+          ,         ( InverseGaussCDF(UniformPDF(), spread) + hyp_location(1) )
+          ,         ( UniformPDF() * 2.0 * M_PI )
+          ,         1.0
+          ) );
   }
 }
 
@@ -107,16 +108,17 @@ void ParticleFilter::update( const vec &motion, const std::vector<vec> &obs )
   // record the observation
   this->latestobs = obs;
   gettimeofday( &this->obstimestamp, NULL );
-  // update the particle based on motion and observation
-  for ( Particle particle : this->particles ) {
-    // add the pose information (mu, sigma)
-    particle.pose += motion;
-    // TODO: place forward, strafe, and turning sigmas in here
-    // create 2d gauss in here? they are techincally independent gauss distributions
-    // we might want to add some amount of noise right here
-    particle.health = this->weight( particle );
+  // update the particle based on motion and observation (bel(x_t|z_t-1))
+  for ( Particle &particle : this->particles ) {
+    // add the pose motion
+    particle.pose += motion +
+      vec({ InverseGaussCDF(UniformPDF(), 1.0),
+          InverseGaussCDF(UniformPDF(), 1.0),
+          InverseGaussCDF(UniformPDF(), 0.2) });
+    // weigh the particle
+    particle.health = this->weight( particle, obs );
   }
-
+  // resample bel(z_t|x_t)
   this->resample();
 }
 
@@ -131,26 +133,20 @@ double ParticleFilter::weight( const Particle &particle , const std::vector<vec>
   mat g = Gauss2Kernel(3, 0.5); // create a gauss kernel
   g /= accu(g); // normalize
 
-  // this only works for one observation (the current particle's position)
-  // change it to work for multiple observations
-  // mat h = world.getPortion( particle.pose( 0 ) , particle.pose( 1 ), 0.0, 3 );
-  std::vector<mat> o;
-  for ( vec &z : observations ) {
-    o.push_back( world.getPortion( particle.pose( 0 ) +
-                                   z( 0 ) * cos( particle.pose( 2 ) ) + 
-                                   z( 1 ) * -sin( particle.pose( 2 ) ),
-                                   particle.pose( 1 ) +
-                                   z( 0 ) * sin( particle.pose( 2 ) ) +
-                                   z( 1 ) * cos( particle.pose( 2 ) ),
-                                   0.0, 3 );
-  }
-
-  // change this to cross correlation for all observations
-  // double cross_correlation = accu( g % h );
+  // do a cross correlation between the gauss kernel
+  // and the observation's frame of reference in the world
   double total_probability = 0.0;
-  for ( mat &h : o ) {
-    double cross_correlation = g % h;
-    total_probability += cross_correlation;
+  mat rz = reshape(mat({
+        cos(particle.pose(2)), -sin(particle.pose(2)),
+        sin(particle.pose(2)), cos(particle.pose(2))
+        }), 2, 2).t();
+  for (vec &z : observations) {
+    vec offset = rz * vec({ z(0), z(1) });
+    mat h = world.getPortion(
+        particle.pose(0) + offset(0),
+        particle.pose(1) + offset(1),
+        0.0, 3);
+    total_probability += g % h;
   }
   // normalize
   total_probability /= observations.size();
@@ -159,8 +155,8 @@ double ParticleFilter::weight( const Particle &particle , const std::vector<vec>
 }
 
 /*
-Long comment about importance/resample will go here
-*/
+   Long comment about importance/resample will go here
+ */
 void ParticleFilter::resample( void ) 
 {
   // create the probability wheel
@@ -177,7 +173,7 @@ void ParticleFilter::resample( void )
   int index = rand() % this->particles.size();
   double beta = 0.0;
   std::vector<Particle> new_particles;
- 
+
   for ( int i = 0; i < (int)this->particles.size(); i++ ) {
     beta += UniformPDF() * 2.0 * max_weight;
     while ( wheel(index) <= beta ) {
@@ -191,8 +187,8 @@ void ParticleFilter::resample( void )
 }
 
 /*
-Long comment about predict will go here
-*/
+   Long comment about predict will go here
+ */
 vec ParticleFilter::predict( double &sigma ) {
   // calculate E[X]
   vec mean = zeros<vec>(3);
@@ -203,11 +199,11 @@ vec ParticleFilter::predict( double &sigma ) {
 
   // sigma = cov(X, X) = E[X^2] - E[X]^2
   for ( Particle particle : this->particles ) {
-      vec delta = vec({
-          particle.pose(0) - mean(0)
+    vec delta = vec({
+        particle.pose(0) - mean(0)
         , particle.pose(1) - mean(1)
-      });
-      sigma += dot( delta, delta );
+        });
+    sigma += dot( delta, delta );
   }
   sigma /= this->particles.size();
   return mean;

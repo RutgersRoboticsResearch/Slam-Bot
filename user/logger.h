@@ -1,5 +1,5 @@
-#ifndef __SB_LOGGER_H__
-#define __SB_LOGGER_H__
+#ifndef __TK_LOGGER_H__
+#define __TK_LOGGER_H__
 
 #include <armadillo>
 

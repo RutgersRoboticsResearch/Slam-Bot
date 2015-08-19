@@ -1,5 +1,5 @@
-#ifndef __SB_USER_H__
-#define __SB_USER_H__
+#ifndef __TK_USER_H__
+#define __TK_USER_H__
 
 #include "xboxctrl.h"
 #include "coord.h"

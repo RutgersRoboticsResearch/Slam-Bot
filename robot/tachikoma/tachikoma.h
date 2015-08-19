@@ -1,5 +1,5 @@
-#ifndef __SB_TACHIKOMA_H__
-#define __SB_TACHIKOMA_H__
+#ifndef __TK_TACHIKOMA_H__
+#define __TK_TACHIKOMA_H__
 
 #include <armadillo>
 #include "baserobot.h"

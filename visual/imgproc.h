@@ -52,7 +52,7 @@ arma::mat laplace_gauss2(arma::uword n, double sigma2);
  *    (optional) use the difference of gauss operator
  *  @return the edge matrix
  */
-arma::mat edge2(const arma::mat &F, arma::uword n,
+arma::mat edge2(const arma::mat &F, arma::uword n, double sigma2,
     bool isSobel = true, bool isDoG = true);
 
 /** Create a matrix representing the edges, for an RGB image.
@@ -63,7 +63,7 @@ arma::mat edge2(const arma::mat &F, arma::uword n,
  *  @return the edge matrix
  *  @note this uses the default parameters for the convolution
  */
-arma::mat edge2rgb(const arma::cube &F, arma::uword n);
+arma::mat edge2rgb(const arma::cube &F, arma::uword n, double sigma2);
 
 /** Generate a gradient matrix of a grayscale image.
  *  @param F
@@ -84,7 +84,7 @@ std::vector<arma::cube> gradient2rgb(const arma::cube &F);
  *    the image to apply nmm on
  *  @return a non-maximally suppressed matrix
  */
-arma::mat nmm_suppress(const arma::mat &F);
+arma::mat nmm2(const arma::mat &F);
 
 /** Cluster the matrix using the distance vectors in the matrix.
  *  @param S
@@ -95,7 +95,7 @@ arma::mat nmm_suppress(const arma::mat &F);
  */
 arma::mat k_cluster(const arma::mat &S, arma::uword k);
 
-/** Generate a segmented picture based on the k clustered histogram
+/** Generate a segmented picture based on the k clustered histogram.
  *  @param F
  *    the image to segment
  *  @param k
@@ -104,7 +104,7 @@ arma::mat k_cluster(const arma::mat &S, arma::uword k);
  */
 arma::mat hist_segment2(const arma::mat &F, arma::uword k);
 
-/** Generate a segmented picture based on the k clustered RGB hist
+/** Generate a segmented picture based on the k clustered RGB hist.
  *  @param F
  *    the image to segment
  *  @param k
@@ -120,7 +120,7 @@ arma::cube hist_segment2rgb(const arma::cube &F, arma::uword k);
  *    the second patch
  *  @return the sum of the absolute differences of the patches
  */
-double sad(const arma::mat &I1, const arma::mat &I2);
+double sad2(const arma::mat &I1, const arma::mat &I2);
 
 /** Get the sum of square differences of two patches.
  *  @param I1
@@ -129,7 +129,7 @@ double sad(const arma::mat &I1, const arma::mat &I2);
  *    the second patch
  *  @return the sum of the square differences of the patches
  */
-double ssd(const arma::mat &I1, const arma::mat &I2);
+double ssd2(const arma::mat &I1, const arma::mat &I2);
 
 /** Get the normalized cross-correlation of two patches.
  *  @param I1
@@ -138,6 +138,17 @@ double ssd(const arma::mat &I1, const arma::mat &I2);
  *    the second patch
  *  @return the normalized cross correlation of two patches
  */
-double ncc(const arma::mat &I1, const arma::mat &I2);
+double ncc2(const arma::mat &I1, const arma::mat &I2);
+
+/** Get the corners of an image using the Harris feature detector.
+ *  @param I
+ *    the image
+ *  @param W
+ *    the weights of importance of a patch
+ *  @return the image gradient
+ */
+arma::mat harris2(const arma::mat &I, const arma::mat &W);
+
+arma::mat imresize2(const arma::mat &A, arma::uword m, arma::uword n);
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef __SB_AGENT_H__
-#define __SB_AGENT_H__
+#ifndef __TK_AGENT_H__
+#define __TK_AGENT_H__
 
 #include "coord.h"
 

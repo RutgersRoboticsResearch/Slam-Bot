@@ -1,5 +1,5 @@
-#ifndef __SB_XBOXCTRL_H__
-#define __SB_XBOXCTRL_H__
+#ifndef __TK_XBOXCTRL_H__
+#define __TK_XBOXCTRL_H__
 
 #include <stdint.h>
 

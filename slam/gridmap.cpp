@@ -66,11 +66,14 @@ arma::mat GridMap::getPortion(double x, double y, double theta,
     int diameter, double precision) {
   double radius = (double)diameter / 2.0;
   arma::mat G(diameter, diameter);
-  for (int i = 0; i < H.n_rows; i++) {
-    for (int j = 0; j < H.n_cols; j++) {
-      double x0 = ((double)j - center_x) * precision;
-      double y0 = ((double)i - center_y) * precision;
-
+  for (int i = 0; i < diameter; i++) {
+    for (int j = 0; j < diameter; j++) {
+      double x0 = ((double)j - radius) * precision;
+      double y0 = ((double)i - radius) * precision;
+      int X = (int)round(x0 * cos(theta) - y0 * sin(theta)) + x;
+      int Y = (int)round(y0 * sin(theta) + y0 * cos(theta)) + y;
+      uint8_t V = gridmap_get(this->map, X, Y);
+      H(i, j) = (double)V / 255.0;
     }
   }
 }

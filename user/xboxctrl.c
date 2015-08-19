@@ -59,9 +59,9 @@ error:
   memset(ctrl, 0, (size_t)&ctrl->A - (size_t)ctrl);
 }
 
-/** Hidden. Update a joystick device asynchronously.
- *  @param controller_arg
- *    A (void *) pointer to a controller struct.
+/** Update a joystick device.
+ *  @param ctrl
+ *    A pointer to a controller struct.
  *  @return 0 on success, else -1
  */
 int xboxctrl_update(xboxctrl_t *ctrl) {
@@ -90,6 +90,7 @@ int xboxctrl_update(xboxctrl_t *ctrl) {
 
   /* update device values */
   if (read(ctrl->fd, &event, sizeof(struct js_event)) == -1) {
+    /* perhaps this is blocking? check later... (bug) */
     return -1;
   }
   if (event.type & JS_EVENT_BUTTON) {

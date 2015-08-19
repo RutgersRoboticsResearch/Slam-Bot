@@ -1,5 +1,5 @@
-#ifndef __SB_SERIAL_H__
-#define __SB_SERIAL_H__
+#ifndef __TK_SERIAL_H__
+#define __TK_SERIAL_H__
 
 #include <stdint.h>
 #define SWBUFMAX    128
