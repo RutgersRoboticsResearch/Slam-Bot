@@ -6,6 +6,8 @@
 #include <opencv2/core/core.hpp>
 
 arma::cube load_image(const std::string &image_name);
+void save_image(const std::string &image_name, const arma::mat &image);
+void save_image(const std::string &image_name, const arma::cube &image);
 void disp_image(const std::string &window_name, const arma::mat &image);
 void disp_image(const std::string &window_name, const arma::cube &image);
 void disp_wait(void);

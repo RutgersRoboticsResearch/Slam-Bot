@@ -6,11 +6,23 @@
 static int limit(int x, int minv, int maxv);
 
 arma::cube load_image(const std::string &image_name) {
-  cv::Mat cv_image = cv::imread(image_name.c_str(), CV_LOAD_IMAGE_COLOR);
+  cv::Mat cv_image = cv::imread(image_name, CV_LOAD_IMAGE_COLOR);
   if (!cv_image.data) {
     printf("Warning: No image data!\n");
   }
   return cvt_opencv2arma(cv_image) / 255.0;
+}
+
+void save_image(const std::string &image_name, const arma::cube &image) {
+  cv::Mat cv_image = cvt_arma2opencv(image);
+  cv::imwrite(image_name, cv_image);
+}
+
+void save_image(const std::string &image_name, const arma::mat &image) {
+  arma::cube c_image(image.n_rows, image.n_cols, 1);
+  c_image.slice(0) = image * 255.0;
+  cv::Mat cv_image = cvt_arma2opencv(c_image);
+  cv::imwrite(image_name, cv_image);
 }
 
 arma::cube cvt_opencv2arma(const cv::Mat &cv_image) {

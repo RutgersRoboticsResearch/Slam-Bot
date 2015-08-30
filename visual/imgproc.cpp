@@ -164,16 +164,32 @@ vector<cube> gradient2rgb(const cube &F) {
   return g;
 }
 
-mat nmm2(const mat &F) {
-  mat A(F.n_rows + 2, F.n_cols + 2, fill::zeros);
-  A(span(1, F.n_rows), span(1, F.n_cols)) = F;
+mat nmm2(const mat &F, uword nsize, bool min_en, bool max_en) {
+  mat A(F.n_rows + (2 * nsize), F.n_cols + (2 * nsize), fill::zeros);
+  A(span(nsize, F.n_rows+nsize-1), span(nsize, F.n_cols+nsize-1)) = F;
   mat G(F.n_rows, F.n_cols);
   for (uword i = 0; i < F.n_rows; i++) {
     for (uword j = 0; j < F.n_cols; j++) {
       G(i, j) = 0.0;
-      if (((A(i+1,j+1)-A(i+1,j)) * (A(i+1,j+1)-A(i+1,j+2)) >= 0.0) ||
-          ((A(i+1,j+1)-A(i,j+1)) * (A(i+1,j+1)-A(i+2,j+1)) >= 0.0)) {
-        G(i, j) = A(i+1,j+1);
+      if (nsize == 1) {
+        if (min_en) {
+          if ((A(i+1,j+1) < A(i+1,j) && A(i+1,j+1) < A(i+1,j+2)) ||
+              (A(i+1,j+1) < A(i,j+1) && A(i+1,j+1) < A(i+2,j+1))) {
+            G(i, j) = A(i+1,j+1);
+          }
+        }
+        if (max_en) {
+          if ((A(i+1,j+1) > A(i+1,j) && A(i+1,j+1) > A(i+1,j+2)) ||
+              (A(i+1,j+1) > A(i,j+1) && A(i+1,j+1) > A(i+2,j+1))) {
+            G(i, j) = A(i+1,j+1);
+          }
+        }
+      } else {
+        mat sec = A(span(i,i+(2*nsize)),span(j,j+(2*nsize)));
+        if ((min_en && A(i+nsize,j+nsize) == sec.min()) ||
+            (max_en && A(i+nsize,j+nsize) == sec.max())) {
+          G(i, j) = A(i+nsize,j+nsize);
+        }
       }
     }
   }
@@ -323,35 +339,14 @@ mat harris2(const mat &I, const mat &W) {
   assert(W.n_rows == W.n_cols);
   std::vector<mat> G = gradient2(I); // grab the gradients
   // place gradients into padded matrix
-  mat Ixx(I.n_rows+W.n_rows-1, I.n_cols+W.n_cols-1, fill::zeros);
-  mat Ixy(I.n_rows+W.n_rows-1, I.n_cols+W.n_cols-1, fill::zeros);
-  mat Iyy(I.n_rows+W.n_rows-1, I.n_cols+W.n_cols-1, fill::zeros);
-  uword a = W.n_rows / 2;
-  uword b = W.n_cols / 2;
-  Ixx(span(a,I.n_rows+a-1), span(b,I.n_cols+b-1)) = G[0] % G[0];
-  Ixy(span(a,I.n_rows+a-1), span(b,I.n_cols+b-1)) = G[0] % G[1];
-  Iyy(span(a,I.n_rows+a-1), span(b,I.n_cols+b-1)) = G[1] % G[1];
-  // set up a corner matrix
-  mat H(I.n_rows, I.n_cols);
+  mat wIxx = conv2(G[0] % G[0], W);
+  mat wIxy = conv2(G[0] % G[1], W);
+  mat wIyy = conv2(G[1] % G[1], W);
   // find the taylor expansion-based corner detector
-  for (uword i = 0; i < I.n_rows; i++) {
-    for (uword j = 0; j < I.n_cols; j++) {
-      // create a jacobian (first order taylor expansion)
-      double wIxx = accu(conv2(W, Ixx(span(i,i+W.n_rows-1), span(j,j+W.n_cols-1))));
-      double wIxy = accu(conv2(W, Ixy(span(i,i+W.n_rows-1), span(j,j+W.n_cols-1))));
-      double wIyy = accu(conv2(W, Iyy(span(i,i+W.n_rows-1), span(j,j+W.n_cols-1))));
-      mat A = reshape(mat({
-        wIxx, wIxy,
-        wIxy, wIyy
-      }), 2, 2);
-      // use harris response for eigenvalue representation
-      double k = 0.1;
-      double R = det(A) - k * (trace(A) * trace(A));
-      // normalize it? maybe later...
-      H(i, j) = R;
-    }
-  }
-  return H;
+  //double k = 0.07;
+  //return ((wIxx % wIyy) - (wIxy % wIxy)) - (k * ((wIxx + wIyy) % (wIxx + wIyy)));
+  double eps = 0.05;
+  return 2.0 * ((wIxx % wIyy) - (wIxy % wIxy)) / (wIxx + wIyy + eps);
 }
 
 static vec mergesort(const vec &nums) {
@@ -410,39 +405,75 @@ mat medfilt2(const mat &F, uword k) {
 }
 
 mat imresize2(const mat &A, uword m, uword n) {
-  mat G(m, n);
+  mat G(m, n, fill::zeros);
   double kr = (double)A.n_rows / (double)m;
   double kc = (double)A.n_cols / (double)n;
-  // then do bilinear interpolation (better with a kernel, but whatever)
+  // bilinear interpolation
   for (uword i = 0; i < m; i++) {
     for (uword  j = 0; j < n; j++) {
-      double ia = (double)(i) * kr;
-      double ib = (double)(i+1) * kr;
-      double ja = (double)(j) * kc;
-      double jb = (double)(j+1) * kc;
-      uword mini = MIN((uword)floor(ia), 0);
-      uword maxi = MAX((uword)ceil(ib), A.n_rows);
-      uword minj = MIN((uword)floor(ja), 0);
-      uword maxj = MAX((uword)ceil(jb), A.n_cols);
-      mat P = A(span(mini, maxi-1), span(minj, maxj-1));
-      
-      G(i, j) = (A(mini,minj)*((double)maxi-ni)+A(maxi,minj)*(ni-(double)mini))*((double)maxj-nj) +
-        (A(mini,maxj)*((double)maxi-ni)+A(maxi,maxj)*(ni-(double)mini))*(nj-(double)minj);
+      double y = (double)i * kr - 0.5;
+      double x = (double)j * kc - 0.5;
+      int i_ = (int)floor(y);
+      int j_ = (int)floor(x);
+      double dy = 1.0 - (y - floor(y));
+      double dx = 1.0 - (x - floor(x));
+      double total = 0.0;
+      if (j_ >= 0 && j_ < (int)A.n_cols) {
+        if (i_ >= 0 && i_ < (int)A.n_rows) {
+          G(i, j) += dx * dy * A(i_,j_);
+          total += dx * dy;
+        }
+        if (i_+1 >= 0 && i_+1 < (int)A.n_rows) {
+          G(i, j) += dx * (1-dy) * A(i_+1,j_);
+          total += dx * (1-dy);
+        }
+      }
+      if (j_+1 >= 0 && j_+1 < (int)A.n_cols) {
+        if (i_ >= 0 && i_ < (int)A.n_rows) {
+          G(i, j) += (1-dx) * dy * A(i_,j_+1);
+          total += (1-dx) * dy;
+        }
+        if (i_+1 >= 0 && i_+1 < (int)A.n_rows) {
+          G(i, j) += (1-dx) * (1-dy) * A(i_+1,j_+1);
+          total += (1-dx) * (1-dy);
+        }
+      }
+      if (total != 0.0) {
+        G(i, j) /= total;
+      }
     }
   }
   return G;
 }
 
-vector<mat> laplace_pyramid2(const mat &H) {
-  uword row_size = H.n_rows;
-  uword col_size = H.n_cols;
+mat fast_imresize_half(const arma::mat &A) {
+  assert(A.n_rows > 1 && A.n_cols > 1);
+  mat I(A.n_rows/2, A.n_cols/2);
+  for (uword i = 0; i < I.n_rows; i++) {
+    for (uword j = 0; j < I.n_cols; j++) {
+      uword i_ = i * 2;
+      uword j_ = j * 2;
+      I(i, j) = (A(i_, j_) + A(i_+1, j_+1) +
+                 A(i_+1, j_) + A(i_, j_+1))/4;
+    }
+  }
+  return I;
+}
+
+cube imresize2rgb(const cube &C, uword m, uword n) {
+  cube F(m, n, C.n_slices);
+  for (uword k = 0; k < C.n_slices; k++) {
+    F.slice(k) = imresize2(C.slice(k), m, n);
+  }
+  return F;
+}
+
+vector<mat> laplace_pyramid2(const mat &H, size_t levels) {
   vector<mat> P;
+  P.push_back(H);
   mat S = H;
-  P.push_back(S);
-  while (row_size > 1 && col_size > 1) {
-    row_size = row_size / 2;
-    col_size = col_size / 2;
-    S = imresize2(S, row_size, col_size);
+  while ((levels == 0 || P.size() < levels) && S.n_rows > 1 && S.n_cols > 1) {
+    S = fast_imresize_half(S);
     P.push_back(S);
   }
   return P;
