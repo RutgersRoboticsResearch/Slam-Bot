@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -pedantic -Wall -std=gnu99 -O3
+CFLAGS = -pedantic -Wall -Werror -fPIC -std=gnu99 -O3
 OBJECTS = serial.o
 
 all: $(OBJECTS)

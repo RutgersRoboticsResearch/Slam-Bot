@@ -1,25 +1,23 @@
 #ifndef __TACHI_DEFS_H__
 #define __TACHI_DEFS_H__
 
-#include <cmath>
+#include <array>
 
-#define NW          0
-#define NE          1
-#define SW          2
-#define SE          3
-#define ENC_WAIST   0
-#define ENC_THIGH   1
-#define ENC_KNEE    2
-#define ENC_WHEEL   3
+#define TL          0
+#define TR          1
+#define BL          2
+#define BR          3
+#define LEFT        0
+#define RIGHT       1
+#define WAIST       0
+#define THIGH       1
+#define KNEE        2
+#define WHEEL       3
 
-const static int WAIST_ID[4] = { 0, 1, 2, 3 };
-const static int THIGH_ID[4] = { 4, 5, 6, 7 };
-const static int KNEE_ID[4]  = { 8, 9, 10, 11 };
-const static int WHEEL_ID[4] = { 13, 14, 15, 16 };
-const static int WAIST_DEVID[2] = { 1, 2 };
-const static int THIGH_DEVID[4] = { 3, 4, 5, 6 };
-const static int KNEE_DEVID[4]  = { 7, 8, 9, 10 };
-const static int WHEEL_DEVID[4] = { 11, 12, 13, 14 };
+constexpr std::array<int, 2> WAIST_DEVID({ 1, 2 });
+constexpr std::array<int, 4> THIGH_DEVID({ 3, 4, 5, 6 });
+constexpr std::array<int, 4> KNEE_DEVID({ 7, 8, 9, 10 });
+constexpr std::array<int, 4> WHEEL_DEVID({ 11, 12, 13, 14 });
 
 // Note: all the following measurements are in cm and radians
 // for length and angle respectively

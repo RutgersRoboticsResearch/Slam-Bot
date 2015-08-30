@@ -8,26 +8,25 @@ class Tachikoma : public BaseRobot {
   public:
     Tachikoma(void);
     ~Tachikoma(void);
+    bool connected(void);
     int numconnected(void);
-    void move(const arma::mat &legs,
+    void send(const arma::mat &leg_theta,
+              const arma::mat &leg_vel,
               const arma::vec &wheels,
-              const arma::mat &arms);
-    arma::vec sense(void);
-    void send(const arma::vec &motion);
-    arma::vec recv(void);
+              const arma::mat &arm_theta,
+              bool leg_theta_act = true,
+              bool leg_vel_act = false);
+    arma::vec recv(arma::mat &leg_sensors);
     void reset(void);
 
     arma::vec leg_fk_solve(const arma::vec &enc, int legid);
     arma::vec leg_ik_solve(const arma::vec &pos, const arma::vec &enc, int legid);
-    void update_forward_step(const arma::vec &curr, const arma::vec &target, int legid);
-    void update_backward_step(const arma::vec &curr, const arma::vec &target, int legid);
 
     // updated on send
-    arma::vec prev_motion;
-    arma::vec motion_const;
+    arma::mat leg_write;
     // updated on recv
-    arma::vec sensor_vector;
-    arma::mat leg_sensors;
+    arma::mat leg_read;
+    // updated on forward kinematics
     arma::mat leg_positions;
 };
 

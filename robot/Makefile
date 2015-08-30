@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS = -pedantic -Wall -Werror --std=c++11 -O3
+CFLAGS = -pedantic -Wall -Werror -fPIC --std=c++11 -O3
 SERIAL_DIR = $(shell pwd)/serial
 TBR_DIR = $(shell pwd)/tbr
 TACHIKOMA_DIR = $(shell pwd)/tachikoma
@@ -9,12 +9,12 @@ INCLUDE = -I$(SERIAL_DIR) \
 SUBDIRS = $(SERIAL_DIR) \
 					$(TBR_DIR) \
 					$(TACHIKOMA_DIR)
-LIBS = -larma
+LIBS = -larmadillo
 OBJECTS = baserobot.o
 LIBOBJS = $(SERIAL_DIR)/serial.o \
           $(TBR_DIR)/tbr.o \
           $(TACHIKOMA_DIR)/tachikoma.o
-TARGET = librobot.a
+TARGET = librobot.so
 
 all: subdirs $(OBJECTS) $(TARGET)
 
@@ -24,8 +24,8 @@ subdirs:
 baserobot.o: baserobot.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) -o $@ -c $<
 
-librobot.a: $(OBJECTS) $(LIBOBJS)
-	ar rvs $@ $^ $(LIBS)
+librobot.so: $(OBJECTS) $(LIBOBJS)
+	$(CC) -shared -o $@ $^ $(LIBS)
 
 clean:
 	rm -f $(OBJECTS) $(TARGET)

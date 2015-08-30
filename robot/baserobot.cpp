@@ -69,15 +69,22 @@ bool BaseRobot::connect(void) {
     serial_connect(connection, pport, DEV_BAUD);
     if (!connection->connected) {
       continue;
+    } else {
+      this->connections.push_back(connection);
     }
-    // read a message
-    char *msg;
-    nanosleep(&synctime, NULL);
+  }
+  // read a message from each device
+  nanosleep(&synctime, NULL);
+  char *msg;
+  for (serial_t *connection : this->connections) {
     do  {
       msg = serial_read(connection);
     } while (!msg || strlen(msg) == 0);
-    // read another one in case that one was garbage
-    nanosleep(&synctime, NULL);
+  }
+  // read another one in case that one was garbage
+  nanosleep(&synctime, NULL);
+  for (size_t i = 0; i < this->connections.size(); i++) {
+    serial_t *connection = this->connections[i];
     do {
       msg = serial_read(connection);
     } while (!msg || strlen(msg) == 0);
@@ -85,16 +92,16 @@ bool BaseRobot::connect(void) {
     int id;
     sscanf(msg, "[%d ", &id);
     if (id > 0) { // make sure the id is not 0
-      this->connections.push_back(connection);
       this->ids.push_back(id);
     } else {
       serial_disconnect(connection);
+      this->connections.erase(this->connections.begin() + i);
       delete connection;
     }
   }
 
   // disconnect if number of devices is not enough, or there are too many
-  if (this->connections.size() == 0) {
+  if (!this->connected()) {
     this->disconnect();
     return false;
   } else {

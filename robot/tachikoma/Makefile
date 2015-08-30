@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS = -pedantic -Wall --std=c++11 -O3
+CFLAGS = -pedantic -Wall -Werror -fPIC --std=c++11 -O3
 SERIAL = $(shell pwd)/../serial
 BASEROBOT = $(shell pwd)/..
 INCLUDE = -I$(SERIAL) -I$(BASEROBOT)
