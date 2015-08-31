@@ -28,6 +28,9 @@ class Tachikoma : public BaseRobot {
     arma::mat leg_read;
     // updated on forward kinematics
     arma::mat leg_positions;
+
+  private:
+    char thigh_signature;
 };
 
 #endif

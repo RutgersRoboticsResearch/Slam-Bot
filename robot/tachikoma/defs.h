@@ -3,16 +3,25 @@
 
 #include <array>
 
-#define TL          0
-#define TR          1
-#define BL          2
-#define BR          3
-#define LEFT        0
-#define RIGHT       1
-#define WAIST       0
-#define THIGH       1
-#define KNEE        2
-#define WHEEL       3
+#define WAIST_LEFT  0
+#define WAIST_RIGHT 1
+#define THIGH_UP    0
+#define THIGH_LEFT  1
+#define THIGH_RIGHT 2
+#define THIGH_DOWN  3
+#define UL          0
+#define UR          1
+#define DL          2
+#define DR          3
+#define WAIST_POS   0
+#define THIGH_POS   1
+#define KNEE_POS    2
+#define WHEEL_VEL   3
+#define WAIST_VEL   4
+#define THIGH_VEL   5
+#define KNEE_VEL    6
+#define NUM_LEGS    4
+#define NUM_JOINTS  3
 
 constexpr std::array<int, 2> WAIST_DEVID({ 1, 2 });
 constexpr std::array<int, 4> THIGH_DEVID({ 3, 4, 5, 6 });
