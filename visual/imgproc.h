@@ -1,8 +1,10 @@
 #ifndef __TK_IMGPROC_H__
 #define __TK_IMGPROC_H__
 
-#include <armadillo>
+#ifndef __NVCC__
+
 #include <vector>
+#include <armadillo>
 
 /** Convolve a grayscale image with some kernel.
  *  @param F the image to convolve
@@ -151,5 +153,18 @@ std::vector<arma::mat> laplace_pyramid2(const arma::mat &H, size_t levels = 0);
  *  @return the original image
  */
 arma::mat laplace_restore(const std::vector<arma::mat> &P);
+
+#else
+
+/** GPU Convolve an image with a kernel
+ *  @param F the image
+ *  @param H the kernel
+ *  @param H2 optional second kernel, vector (H must also be vector)
+ *  @param isSym activates symmetric GPU kernel call
+ *  @return the convolved image
+ */
+gcube_t *gpu_conv2(gcube_t *F, gcube_t *H, gcube_t *H2 = NULL, isSym = false);
+
+#endif
 
 #endif
