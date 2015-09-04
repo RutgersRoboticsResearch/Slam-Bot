@@ -1,18 +1,7 @@
 #include "imgfmt.h"
 #include "imgproc.h"
-#include "math.h"
-
-#define IJ2C(i,j,ld)(((j)*(ld))+(i))
-#define IJK2C(i,j,k,ld,rd) (((k)*(ld)*(rd))+((j)*(ld))+(i)) // column wise ordering
-#define GPU_submat(i,j,height,width,from,to) \
-  { \
-    int _i, _j; \
-    for (_i = 0; _i < height; _i++) { \
-      for (_j = 0; _j < width; _j++) { \
-        to[IJK2C(i,j,1)] = from[IJK2C(i+_i,j+_j,1)]; \
-      } \
-    } \
-  }
+#include <cmath>
+#include "gpu_util.h"
 
 // Refer to imgproc.cpp::conv2
 __global__ void GPU_conv2_gen(float *G, float *F, float *H, int F_n_rows, int F_n_cols, int H_n_rows, int H_n_cols) {
@@ -76,20 +65,28 @@ __global__ void GPU_conv2_sym(float *G, float *F, float *Hy, float *Hx, int F_n_
 
 gcube_t *gpu_conv2(gcube_t *F, gcube_t *H, gcube_t *H2, bool isSym) {
   gcube_t *G = (gcube_t *)malloc(sizeof(gcube_t));
-  cudaMalloc(&G->d_pixels, sizeof(float) * F->n_rows * F->n_cols);
+  checkCudaErrors(cudaMalloc(&G->d_pixels, sizeof(float) * F->n_rows * F->n_cols));
   G->n_rows = F->n_rows;
   G->n_cols = F->n_cols;
   G->n_slices = 1;
+  dim3 blockSize(16, 16, 1);
+  dim3 gridSize((F->n_rows-1)/16+1, (F->n_cols-1)/16+1, 1);
   if (!isSym) {
-    dim3 blockSize(16, 16, 1);
-    dim3 gridSize((F->n_rows-1)/16+1, (F->n_cols-1)/16+1, 1);
     GPU_conv2_gen<<<gridSize, blockSize>>>(
-        G->d_pixels, F->d_pixels, H->n_cols,
+        G->d_pixels, F->d_pixels, H->d_pixels,
         F->n_rows, F->n_cols, H->n_rows, H->n_cols);
+    checkCudaErrors(cudaGetLastError());
   } else {
     GPU_conv2_sym<<<gridSize, blockSize, sizeof(float) * 256>>>(
         G->d_pixels, F->d_pixels, H->d_pixels, H2->d_pixels,
         F->n_rows, F->n_cols, H->n_rows, H->n_cols);
+    checkCudaErrors(cudaGetLastError());
   }
   return G;
+}
+
+void gpu_gauss(gcube_t **v, gcube_t **h, int n, double sigma2) {
+  assert(n > 0);
+  (*v) = create_gcube(n, 1, 1);
+  (*h) = create_gcube(1, n, 1);
 }

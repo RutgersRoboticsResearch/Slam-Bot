@@ -82,7 +82,7 @@ typedef struct gpu_imgcube {
  *  @param zeros set all elements to 0
  *  @return a wrapper for a GPU matrix
  */
-gcube_t *create_gcube(int n_rows, int n_cols. int n_slices, bool zeros = false);
+gcube_t *create_gcube(int n_rows, int n_cols, int n_slices, bool zeros = false);
 
 /** Create a GPU matrix from an OpenCV image
  *  @param cv_image the OpenCV image
@@ -91,9 +91,15 @@ gcube_t *create_gcube(int n_rows, int n_cols. int n_slices, bool zeros = false);
 gcube_t *create_gcube(const cv::Mat &cv_image);
 
 /** Free a GPU matrix
- *  @param img the matrix to free
+ *  @param pointer to the matrix to free
  */
-void destroy_gcube(gcube_t *img);
+void destroy_gcube(gcube_t **img);
+
+/** Grab the representation of the GPU matrix in an OpenCV matrix
+ *  @param img the matrix representing the image
+ *  @return the OpenCV conversion of the matrix
+ */
+cv::Mat gcube2cvMat(gcube_t *img);
 
 /** Load a GPU matrix of an image
  *  @param image_name the name of the image to be loaded
@@ -101,11 +107,13 @@ void destroy_gcube(gcube_t *img);
  */
 gcube_t *load_gcube(const std::string image_name);
 
-/** Grab the representation of the GPU matrix in an OpenCV matrix
- *  @param img the matrix representing the image
- *  @return the OpenCV conversion of the matrix
- */
-cv::Mat cvt_gcube2cv(gcube_t *img);
+void disp_gcube(const std::string window_name, gcube_t *image);
+
+void disp_wait(void);
+
+gcube_t *gpu_rgb2gray(gcube_t *image);
+
+gcube_t *gpu_gray2rgb(gcube_t *image);
 
 #endif
 

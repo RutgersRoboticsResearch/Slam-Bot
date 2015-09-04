@@ -163,7 +163,7 @@ arma::mat laplace_restore(const std::vector<arma::mat> &P);
  *  @param isSym activates symmetric GPU kernel call
  *  @return the convolved image
  */
-gcube_t *gpu_conv2(gcube_t *F, gcube_t *H, gcube_t *H2 = NULL, isSym = false);
+gcube_t *gpu_conv2(gcube_t *F, gcube_t *H, gcube_t *H2 = NULL, bool isSym = false);
 
 #endif
 
