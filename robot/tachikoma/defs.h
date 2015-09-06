@@ -3,16 +3,35 @@
 
 #include <array>
 
-#define WAIST_LEFT  0
-#define WAIST_RIGHT 1
-#define THIGH_UP    0
-#define THIGH_LEFT  1
-#define THIGH_RIGHT 2
-#define THIGH_DOWN  3
+// General Definitions //
+#define NUM_LEGS    4
+#define NUM_JOINTS  3
+#define WAIST       0
+#define THIGH       1
+#define KNEE        2
+#define WHEELS      3
 #define UL          0
 #define UR          1
 #define DL          2
 #define DR          3
+
+// Device Ids //
+#define WAIST_LEFT  1
+#define WAIST_RIGHT 2
+#define THIGH_UP    3
+#define THIGH_LEFT  4
+#define THIGH_RIGHT 5
+#define THIGH_DOWN  6
+#define KNEE_UL     7
+#define KNEE_UR     8
+#define KNEE_DL     9
+#define KNEE_DR     10
+#define WHEEL_UL    11
+#define WHEEL_UR    12
+#define WHEEL_DL    13
+#define WHEEL_DR    14
+
+// Coalesced Matrix Indeces //
 #define WAIST_POS   0
 #define THIGH_POS   1
 #define KNEE_POS    2
@@ -20,13 +39,6 @@
 #define WAIST_VEL   4
 #define THIGH_VEL   5
 #define KNEE_VEL    6
-#define NUM_LEGS    4
-#define NUM_JOINTS  3
-
-constexpr std::array<int, 2> WAIST_DEVID({ 1, 2 });
-constexpr std::array<int, 4> THIGH_DEVID({ 3, 4, 5, 6 });
-constexpr std::array<int, 4> KNEE_DEVID({ 7, 8, 9, 10 });
-constexpr std::array<int, 4> WHEEL_DEVID({ 11, 12, 13, 14 });
 
 // Note: all the following measurements are in cm and radians
 // for length and angle respectively

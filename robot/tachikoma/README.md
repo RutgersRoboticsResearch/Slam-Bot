@@ -5,7 +5,7 @@ The robot itself consists of the following movable parts and sensors:
       <li>a wheel on the bottom (standard)</li>
       <li>a knee based rotation (pitch)</li>
       <li>a thigh based rotation (pitch)</li>
-      </li>a waist rotation (yaw)</li>
+      <li>a waist rotation (yaw)</li>
     </ul>
   </li>
   <li>2 cameras</li>
