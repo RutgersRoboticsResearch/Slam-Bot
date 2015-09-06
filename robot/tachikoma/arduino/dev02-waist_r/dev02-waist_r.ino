@@ -60,6 +60,7 @@ void setup() {
   motors[3] = AFMS.getMotor(4);
 
   pinMode(A0, INPUT);
+  pinMode(A1, INPUT);
 
   pinMode(13, OUTPUT); // set status LED to OUTPUT and HIGH
   digitalWrite(13, HIGH);
