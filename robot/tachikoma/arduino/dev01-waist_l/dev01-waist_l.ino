@@ -7,7 +7,7 @@
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motors[4];
-static int v;
+static int v[2];
 static char instr_activate;
 
 const int bufsize = 256;
@@ -33,10 +33,10 @@ void setmotors(int topv, int btmv) {
   bool btmisneg = btmv < 0;
   topv = limit(abs(topv), 0, 128);
   btmv = limit(abs(btmv), 0, 128);
-  motors[0]->setSpeed(leftv);
-  motors[1]->setSpeed(leftv);
-  motors[2]->setSpeed(rightv);
-  motors[3]->setSpeed(rightv);
+  motors[0]->setSpeed(topv);
+  motors[1]->setSpeed(topv);
+  motors[2]->setSpeed(btmv);
+  motors[3]->setSpeed(btmv);
   if (topisneg) {
     motors[0]->run(BACKWARD);
     motors[1]->run(FORWARD);
@@ -66,7 +66,7 @@ void setup() {
   digitalWrite(13, HIGH);
 
   AFMS.begin();
-  setmotors(0);
+  setmotors(0, 0);
   Serial.begin(57600);
   msecs = millis();
 }

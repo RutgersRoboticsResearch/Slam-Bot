@@ -115,7 +115,7 @@ void setup() {
   digitalWrite(13, HIGH);
 
   AFMS.begin();
-  setmotors(0);
+  setmotors(0, 0);
   Serial.begin(57600);
   msecs = millis();
 }
