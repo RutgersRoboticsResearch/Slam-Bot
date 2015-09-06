@@ -146,7 +146,8 @@ void loop() {
       e[0] = '\0';
       if ((s = strrchr(buf, '['))) {
         // CUSTOMIZE
-        sscanf(s, "[%d]\n", &targetv);
+        sscanf(s, "[%d]\n",
+          &targetv);
       }
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
     }
@@ -164,7 +165,10 @@ void loop() {
   enc.read();
 
   if (millis() - msecs > 100) {
-    sprintf(wbuf, "[%d %d %d]\n", DEV_ID, v, enc.read());
+    sprintf(wbuf, "[%d %d %d]\n",
+      DEV_ID,
+      v,
+      enc.read());
     Serial.print(wbuf);
     msecs = millis();
   }

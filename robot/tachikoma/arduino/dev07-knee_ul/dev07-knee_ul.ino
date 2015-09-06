@@ -8,6 +8,7 @@
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motors[4];
 static int v;
+static char instr_activate;
 
 const int bufsize = 256;
 const int safesize = bufsize / 2;
@@ -66,6 +67,7 @@ void setup() {
 
 static int targetv;
 static int prevv;
+static double targetp;
 
 void loop() {
   int nbytes = 0;
@@ -87,7 +89,10 @@ void loop() {
       e[0] = '\0';
       if ((s = strrchr(buf, '['))) {
         // CUSTOMIZE
-        sscanf(s, "[%d]\n", &targetv);
+        sscanf(s, "[%c %lf %d]\n",
+          &instr_activate,
+          &targetp,
+          &targetv);
       }
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
     }
@@ -104,7 +109,10 @@ void loop() {
   prevv = v;
 
   if (millis() - msecs > 100) {
-    sprintf(wbuf, "[%d %d %d]\n", DEV_ID, v, analogRead(A0));
+    sprintf(wbuf, "[%d %d %lf]\n",
+      DEV_ID,
+      v,
+      (double)analogRead(A0));
     Serial.print(wbuf);
     msecs = millis();
   }

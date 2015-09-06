@@ -19,6 +19,7 @@ static int v[2];
 static char signature;
 static char leftsig;
 static char rightsig;
+static char instr_activate;
 
 const int bufsize = 256;
 const int safesize = bufsize / 2;
@@ -39,12 +40,20 @@ int limit(int x, int a, int b) {
 }
 
 void setmotors(int leftv, int rightv) {
-  bool isneg = v < 0;
+  bool leftisneg = leftv < 0;
+  bool rightisneg = rightv < 0;
   leftv = limit(abs(leftv), 0, 128);
   rightv = limit(abs(rightv), 0, 128);
   if (leftsig == signature) {
     motors[0]->setSpeed(leftv);
     motors[1]->setSpeed(leftv);
+    if (leftisneg) {
+      motors[0]->run(BACKWARD);
+      motors[1]->run(FORWARD);
+    } else {
+      motors[0]->run(FORWARD);
+      motors[1]->run(BACKWARD);
+    }
   } else {
     motors[0]->setSpeed(0);
     motors[1]->setSpeed(0);
@@ -52,20 +61,16 @@ void setmotors(int leftv, int rightv) {
   if (rightsig == signature) {
     motors[2]->setSpeed(rightv);
     motors[3]->setSpeed(rightv);
+    if (rightisneg) {
+      motors[2]->run(FORWARD);
+      motors[3]->run(BACKWARD);
+    } else {
+      motors[2]->run(BACKWARD);
+      motors[3]->run(FORWARD);
+    }
   } else {
-    motors[0]->setSpeed(0);
-    motors[1]->setSpeed(0);
-  }
-  if (isneg) {
-    motors[0]->run(BACKWARD);
-    motors[1]->run(FORWARD);
-    motors[2]->run(FORWARD);
-    motors[3]->run(BACKWARD);
-  } else {
-    motors[0]->run(FORWARD);
-    motors[1]->run(BACKWARD);
-    motors[2]->run(BACKWARD);
-    motors[3]->run(FORWARD);
+    motors[2]->setSpeed(0);
+    motors[3]->setSpeed(0);
   }
 }
 
@@ -117,6 +122,7 @@ void setup() {
 
 static int targetv[2];
 static int prevv[2];
+static double targetp[2];
 
 void loop() {
   int nbytes = 0;
@@ -138,7 +144,13 @@ void loop() {
       e[0] = '\0';
       if ((s = strrchr(buf, '['))) {
         // CUSTOMIZE
-        sscanf(s, "[%c %d %d]\n", &signature, &targetv[0], &targetv[1]);
+        sscanf(s, "[%c %c %lf %lf %d %d]\n",
+          &instr_activate,
+          &signature,
+          &targetp[0],
+          &targetp[1],
+          &targetv[0],
+          &targetv[1]);
         write_signature();
       }
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
@@ -162,7 +174,11 @@ void loop() {
   prevv[1] = v[1];
 
   if (millis() - msecs > 100) {
-    sprintf(wbuf, "[%d %d %d %d]\n", DEV_ID, v[0], v[1], analogRead(A0));
+    sprintf(wbuf, "[%d %d %d %lf]\n",
+      DEV_ID,
+      v[0],
+      v[1],
+      (double)analogRead(A0));
     Serial.print(wbuf);
     msecs = millis();
   }
