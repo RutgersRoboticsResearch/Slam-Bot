@@ -3,11 +3,12 @@
 #include "utility/Adafruit_PWMServoDriver.h"
 #include <string.h>
 
-#define DEV_ID 1
+#define DEV_ID 2
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motors[4];
-static int v;
+static int v[2];
+static char instr_activate;
 
 const int bufsize = 256;
 const int safesize = bufsize / 2;
@@ -27,23 +28,28 @@ int limit(int x, int a, int b) {
   }
 }
 
-void setmotors(int v) {
-  bool isneg = v < 0;
-  v = limit(abs(v), 0, 128);
-  motors[0]->setSpeed(v);
-  motors[1]->setSpeed(v);
-  motors[2]->setSpeed(v);
-  motors[3]->setSpeed(v);
-  if (isneg) {
+void setmotors(int topv, int btmv) {
+  bool topisneg = topv < 0;
+  bool btmisneg = btmv < 0;
+  topv = limit(abs(topv), 0, 128);
+  btmv = limit(abs(btmv), 0, 128);
+  motors[0]->setSpeed(topv);
+  motors[1]->setSpeed(topv);
+  motors[2]->setSpeed(btmv);
+  motors[3]->setSpeed(btmv);
+  if (topisneg) {
     motors[0]->run(BACKWARD);
     motors[1]->run(FORWARD);
-    motors[2]->run(FORWARD);
-    motors[3]->run(BACKWARD);
   } else {
     motors[0]->run(FORWARD);
     motors[1]->run(BACKWARD);
+  }
+  if (btmisneg) {
     motors[2]->run(BACKWARD);
     motors[3]->run(FORWARD);
+  } else {
+    motors[2]->run(FORWARD);
+    motors[3]->run(BACKWARD);
   }
 }
 
@@ -54,18 +60,20 @@ void setup() {
   motors[3] = AFMS.getMotor(4);
 
   pinMode(A0, INPUT);
+  pinMode(A1, INPUT);
 
   pinMode(13, OUTPUT); // set status LED to OUTPUT and HIGH
   digitalWrite(13, HIGH);
 
   AFMS.begin();
-  setmotors(0);
+  setmotors(0, 0);
   Serial.begin(57600);
   msecs = millis();
 }
 
-static int targetv;
-static int prevv;
+static int targetv[2];
+static int prevv[2];
+static double targetp[2];
 
 void loop() {
   int nbytes = 0;
@@ -87,24 +95,39 @@ void loop() {
       e[0] = '\0';
       if ((s = strrchr(buf, '['))) {
         // CUSTOMIZE
-        sscanf(s, "[%d]\n", &targetv);
+        sscanf(s, "[%c %lf %lf %d %d]\n",
+          &instr_activate,
+          &targetp[0],
+          &targetp[1],
+          &targetv[0],
+          &targetv[1]);
       }
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
     }
   }
-  int deltav = targetv - prevv;
-  int sign = deltav >= 0 ? 1 : -1;
-  deltav *= sign;
-  if (deltav > 4) {
-    deltav = 4;
+  int deltav[2] = { targetv[0] - prevv[0], targetv[1] - prevv[1] };
+  int sign[2] = { deltav[0] >= 0 ? 1 : -1, deltav[1] >= 0 ? 1 : -1 };
+  deltav[0] *= sign[0];
+  deltav[1] *= sign[1];
+  if (deltav[0] > 4) {
+    deltav[0] = 4;
   }
-  v = prevv + (deltav * sign);
-  v = limit(v, -255, 255);
-  setmotors(v);
-  prevv = v;
+  if (deltav[1] > 4) {
+    deltav[1] = 4;
+  }
+  v[0] = limit(prevv[0] + (deltav[0] * sign[0]), -255, 255);
+  v[1] = limit(prevv[1] + (deltav[1] * sign[1]), -255, 255);
+  setmotors(v[0], v[1]);
+  prevv[0] = v[0];
+  prevv[1] = v[1];
 
   if (millis() - msecs > 100) {
-    sprintf(wbuf, "[%d %d %d]\n", DEV_ID, v, analogRead(A0));
+    sprintf(wbuf, "[%d %d %d %lf %lf]\n",
+      DEV_ID,
+      v[0],
+      v[1],
+      (double)analogRead(A0),
+      (double)analogRead(A1));
     Serial.print(wbuf);
     msecs = millis();
   }

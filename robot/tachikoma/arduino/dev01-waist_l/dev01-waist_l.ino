@@ -3,22 +3,11 @@
 #include "utility/Adafruit_PWMServoDriver.h"
 #include <string.h>
 
-#define DEV_ID 6
-#define LIN_PIN1  3
-#define LIN_PIN2  4
-#define LOUT_PIN1 5
-#define LOUT_PIN2 6
-#define RIN_PIN1  7
-#define RIN_PIN2  8
-#define ROUT_PIN1 11
-#define ROUT_PIN2 12
+#define DEV_ID 1
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motors[4];
 static int v[2];
-static char signature;
-static char leftsig;
-static char rightsig;
 static char instr_activate;
 
 const int bufsize = 256;
@@ -39,57 +28,29 @@ int limit(int x, int a, int b) {
   }
 }
 
-void setmotors(int leftv, int rightv) {
-  bool leftisneg = leftv < 0;
-  bool rightisneg = rightv < 0;
-  leftv = limit(abs(leftv), 0, 128);
-  rightv = limit(abs(rightv), 0, 128);
-  if (leftsig == signature) {
-    motors[0]->setSpeed(leftv);
-    motors[1]->setSpeed(leftv);
-    if (leftisneg) {
-      motors[0]->run(BACKWARD);
-      motors[1]->run(FORWARD);
-    } else {
-      motors[0]->run(FORWARD);
-      motors[1]->run(BACKWARD);
-    }
+void setmotors(int topv, int btmv) {
+  bool topisneg = topv < 0;
+  bool btmisneg = btmv < 0;
+  topv = limit(abs(topv), 0, 128);
+  btmv = limit(abs(btmv), 0, 128);
+  motors[0]->setSpeed(topv);
+  motors[1]->setSpeed(topv);
+  motors[2]->setSpeed(btmv);
+  motors[3]->setSpeed(btmv);
+  if (topisneg) {
+    motors[0]->run(BACKWARD);
+    motors[1]->run(FORWARD);
   } else {
-    motors[0]->setSpeed(0);
-    motors[1]->setSpeed(0);
+    motors[0]->run(FORWARD);
+    motors[1]->run(BACKWARD);
   }
-  if (rightsig == signature) {
-    motors[2]->setSpeed(rightv);
-    motors[3]->setSpeed(rightv);
-    if (rightisneg) {
-      motors[2]->run(FORWARD);
-      motors[3]->run(BACKWARD);
-    } else {
-      motors[2]->run(BACKWARD);
-      motors[3]->run(FORWARD);
-    }
+  if (btmisneg) {
+    motors[2]->run(BACKWARD);
+    motors[3]->run(FORWARD);
   } else {
-    motors[2]->setSpeed(0);
-    motors[3]->setSpeed(0);
+    motors[2]->run(FORWARD);
+    motors[3]->run(BACKWARD);
   }
-}
-
-void read_signatures() {
-  char leftbit0 = (digitalRead(LIN_PIN1) == HIGH);
-  char leftbit1 = (digitalRead(LIN_PIN2) == HIGH) << 1;
-  leftsig = leftbit1 | leftbit0;
-  char rightbit0 = (digitalRead(RIN_PIN1) == HIGH);
-  char rightbit1 = (digitalRead(RIN_PIN2) == HIGH) << 1;
-  rightsig = rightbit1 | rightbit0;
-}
-
-void write_signature() {
-  char bit0 = (signature & 0x01);
-  char bit1 = (signature & 0x02) >> 1;
-  digitalWrite(LOUT_PIN1, bit0 ? HIGH : LOW);
-  digitalWrite(LOUT_PIN2, bit1 ? HIGH : LOW);
-  digitalWrite(ROUT_PIN1, bit0 ? HIGH : LOW);
-  digitalWrite(ROUT_PIN2, bit1 ? HIGH : LOW);
 }
 
 void setup() {
@@ -99,17 +60,7 @@ void setup() {
   motors[3] = AFMS.getMotor(4);
 
   pinMode(A0, INPUT);
-  
-  // signature synchronization
-  pinMode(LIN_PIN1, INPUT);
-  pinMode(LIN_PIN2, INPUT);
-  pinMode(LOUT_PIN1, OUTPUT);
-  pinMode(LOUT_PIN2, OUTPUT);
-  pinMode(RIN_PIN1, INPUT);
-  pinMode(RIN_PIN2, INPUT);
-  pinMode(ROUT_PIN1, OUTPUT);
-  pinMode(ROUT_PIN2, OUTPUT);
-  write_signature();
+  pinMode(A1, INPUT);
 
   pinMode(13, OUTPUT); // set status LED to OUTPUT and HIGH
   digitalWrite(13, HIGH);
@@ -144,14 +95,12 @@ void loop() {
       e[0] = '\0';
       if ((s = strrchr(buf, '['))) {
         // CUSTOMIZE
-        sscanf(s, "[%c %c %lf %lf %d %d]\n",
+        sscanf(s, "[%c %lf %lf %d %d]\n",
           &instr_activate,
-          &signature,
           &targetp[0],
           &targetp[1],
           &targetv[0],
           &targetv[1]);
-        write_signature();
       }
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
     }
@@ -168,17 +117,17 @@ void loop() {
   }
   v[0] = limit(prevv[0] + (deltav[0] * sign[0]), -255, 255);
   v[1] = limit(prevv[1] + (deltav[1] * sign[1]), -255, 255);
-  read_signatures();
   setmotors(v[0], v[1]);
   prevv[0] = v[0];
   prevv[1] = v[1];
 
   if (millis() - msecs > 100) {
-    sprintf(wbuf, "[%d %d %d %lf]\n",
+    sprintf(wbuf, "[%d %d %d %lf %lf]\n",
       DEV_ID,
       v[0],
       v[1],
-      (double)analogRead(A0));
+      (double)analogRead(A0),
+      (double)analogRead(A1));
     Serial.print(wbuf);
     msecs = millis();
   }

@@ -1,25 +1,13 @@
-Note: This particular code for this particular robot is not for the class Software Engineering. The one for Software Engineering is the Tennis Ball Robot. The tachikoma is a robot meant for outside of the class, for RutgersRoboticsResearch the club, under Jonathan Risinger, Gloria Leung, Changling Huang, Timothy Yong, and Alexander N.
-
-The robot itself consists of the following movable parts:
+The robot itself consists of the following movable parts and sensors:
 <ol>
   <li>4 legs which connect to:
     <ul>
       <li>a wheel on the bottom (standard)</li>
       <li>a knee based rotation (pitch)</li>
       <li>a thigh based rotation (pitch)</li>
-      </li>a base rotation (yaw)</li>
+      <li>a waist rotation (yaw)</li>
     </ul>
   </li>
-  <li>2 arms which connect to:
-    <ul>
-      <li>rotational base</li>
-      <li>rotational arm</li>
-      <li>hand</li>
-    </ul>
-  </li>
-  <li>skirt sensors</li>
-  <li>camera</li>
-  <li>lidar</li>
-  <li>microphone</li>
-  <li>speakers</li>
+  <li>2 cameras</li>
+  <li>lidar(s)</li>
 </ol>
