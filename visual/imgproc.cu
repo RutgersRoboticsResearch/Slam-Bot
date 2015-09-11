@@ -2,12 +2,16 @@
 #include "imgproc.h"
 #include <cmath>
 #include "gpu_util.h"
+#include <cassert>
+#include <cstdio>
 
-// Refer to imgproc.cpp::conv2
 __global__ void GPU_conv2_gen(float *G, float *F, float *H, int F_n_rows, int F_n_cols, int H_n_rows, int H_n_cols) {
   // assume that the matrix represents an image
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   int idy = blockIdx.y * blockDim.y + threadIdx.y;
+  if (idx >= F_n_cols || idy >= F_n_rows) {
+    return;
+  }
   // stencil operation
   int my = H_n_rows / 2;
   int mx = H_n_cols / 2;
@@ -18,10 +22,10 @@ __global__ void GPU_conv2_gen(float *G, float *F, float *H, int F_n_rows, int F_
   int _i, _j, i, j;
   for (i = 0; i < H_n_rows; i++) {
     for (j = 0; j < H_n_cols; j++) {
-      _i = idy + my - i - 1;
-      _j = idx + mx - j - 1;
+      _i = idy + my - i;
+      _j = idx + mx - j;
       if (_i >= 0 && _i < F_n_rows && _j >= 0 && _j < F_n_cols) {
-        total += H[IJ2C(i, j, H_n_rows)] * F[IJ2C(_i, _j, H_n_rows)];
+        total += H[IJ2C(i, j, H_n_rows)] * F[IJ2C(_i, _j, F_n_rows)];
         weight += H[IJ2C(i, j, H_n_rows)];
       }
     }
@@ -29,11 +33,25 @@ __global__ void GPU_conv2_gen(float *G, float *F, float *H, int F_n_rows, int F_
   G[IJ2C(idy, idx, F_n_rows)] = total / weight;
 }
 
+gcube gpu_conv2(const gcube &F, const gcube &K) {
+  gcube G(F.n_rows, F.n_cols);
+  dim3 blockSize(16, 16, 1);
+  dim3 gridSize((F.n_cols-1)/16+1, (F.n_rows-1)/16+1, 1);
+  // call the GPU kernel
+  GPU_conv2_gen<<<gridSize, blockSize>>>(
+      G.d_pixels, F.d_pixels, K.d_pixels,
+      F.n_rows, F.n_cols, K.n_rows, K.n_cols);
+  checkCudaErrors(cudaGetLastError());
+  return G;
+}
+
 __global__ void GPU_conv2_sym(float *G, float *F, float *Hy, float *Hx, int F_n_rows, int F_n_cols, int H_n_rows, int H_n_cols) {
-  extern __shared__ float A[];
   // assume that the matrix represents an image
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   int idy = blockIdx.y * blockDim.y + threadIdx.y;
+  if (idx >= F_n_cols || idy >= F_n_rows) {
+    return;
+  }
   // stencil operation
   int my = H_n_rows / 2;
   int mx = H_n_cols / 2;
@@ -43,9 +61,9 @@ __global__ void GPU_conv2_sym(float *G, float *F, float *Hy, float *Hx, int F_n_
   float weight = 0.0f;
   int _i, _j, i, j;
   for (i = 0; i < H_n_rows; i++) {
-    _i = idy + my - i - 1;
+    _i = idy + my - i;
     if (_i >= 0 && _i < F_n_rows) {
-      total += Hy[i] * F[IJ2C(_i, idx, H_n_rows)];
+      total += Hy[i] * F[IJ2C(_i, idx, F_n_rows)];
       weight += Hy[i];
     }
   }
@@ -54,39 +72,65 @@ __global__ void GPU_conv2_sym(float *G, float *F, float *Hy, float *Hx, int F_n_
   total = 0.0f;
   weight = 0.0f;
   for (j = 0; j < H_n_cols; j++) {
-    _j = idx + mx - j - 1;
+    _j = idx + mx - j;
     if (_j >= 0 && _j < F_n_cols) {
-      total += Hx[j] * F[IJ2C(idy, _j, H_n_rows)];
+      total += Hx[j] * G[IJ2C(idy, _j, F_n_rows)];
       weight += Hx[j];
     }
   }
   G[IJ2C(idy, idx, F_n_rows)] = total / weight;
 }
 
-gcube_t *gpu_conv2(gcube_t *F, gcube_t *H, gcube_t *H2, bool isSym) {
-  gcube_t *G = (gcube_t *)malloc(sizeof(gcube_t));
-  checkCudaErrors(cudaMalloc(&G->d_pixels, sizeof(float) * F->n_rows * F->n_cols));
-  G->n_rows = F->n_rows;
-  G->n_cols = F->n_cols;
-  G->n_slices = 1;
+gcube gpu_conv2(const gcube &F, const gcube &V, const gcube &H) {
+  gcube G(F.n_rows, F.n_cols);
   dim3 blockSize(16, 16, 1);
-  dim3 gridSize((F->n_rows-1)/16+1, (F->n_cols-1)/16+1, 1);
-  if (!isSym) {
-    GPU_conv2_gen<<<gridSize, blockSize>>>(
-        G->d_pixels, F->d_pixels, H->d_pixels,
-        F->n_rows, F->n_cols, H->n_rows, H->n_cols);
-    checkCudaErrors(cudaGetLastError());
-  } else {
-    GPU_conv2_sym<<<gridSize, blockSize, sizeof(float) * 256>>>(
-        G->d_pixels, F->d_pixels, H->d_pixels, H2->d_pixels,
-        F->n_rows, F->n_cols, H->n_rows, H->n_cols);
-    checkCudaErrors(cudaGetLastError());
-  }
+  dim3 gridSize((F.n_cols-1)/16+1, (F.n_rows-1)/16+1, 1);
+  // call the GPU kernel
+  GPU_conv2_sym<<<gridSize, blockSize>>>(
+      G.d_pixels, F.d_pixels, V.d_pixels, H.d_pixels,
+      F.n_rows, F.n_cols, V.n_rows, H.n_cols);
+  checkCudaErrors(cudaGetLastError());
   return G;
 }
 
-void gpu_gauss(gcube_t **v, gcube_t **h, int n, double sigma2) {
+gcube gpu_gauss2(int n, double sigma2) {
   assert(n > 0);
-  (*v) = create_gcube(n, 1, 1);
-  (*h) = create_gcube(1, n, 1);
+  gcube H(n, n);
+  float h_pixels[n * n];
+  float total = 0.0;
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      double x = (double)i - ((double)(n-1)/2);
+      double y = (double)j - ((double)(n-1)/2);
+      float g = (float)exp(-(x * x + y * y) / (2 * sigma2));
+      h_pixels[IJ2C(i, j, n)] = g;
+      total += g;
+    }
+  }
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      h_pixels[IJ2C(i, j, n)] /= total;
+    }
+  }
+  checkCudaErrors(cudaMemcpy(H.d_pixels, h_pixels, n * n * sizeof(float), cudaMemcpyHostToDevice));
+  return H;
+}
+
+void gpu_gauss2(gcube &V, gcube &H, int n, double sigma2) {
+  assert(n > 0);
+  V.create(n);
+  H.create(n);
+  float h_pixels[n];
+  float total = 0.0;
+  for (int i = 0; i < n; i++) {
+    double x = (double)i - ((double)(n-1)/2);
+    float g = (float)exp(-(x * x) / (2 * sigma2));
+    h_pixels[i] = g;
+    total += g;
+  }
+  for (int i = 0; i < n; i++) {
+    h_pixels[i] /= total;
+  }
+  checkCudaErrors(cudaMemcpy(V.d_pixels, h_pixels, n * sizeof(float), cudaMemcpyHostToDevice));
+  checkCudaErrors(cudaMemcpy(H.d_pixels, h_pixels, n * sizeof(float), cudaMemcpyHostToDevice));
 }

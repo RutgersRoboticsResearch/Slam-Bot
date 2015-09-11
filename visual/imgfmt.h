@@ -68,52 +68,15 @@ arma::cube cvt_gray2rgb(const arma::mat &image);
 
 #else
 
-typedef struct gpu_imgcube {
-  float *d_pixels;
-  uint32_t n_rows;
-  uint32_t n_cols;
-  uint32_t n_slices;
-} gcube_t;
+#include "gcube.h"
 
-/** Create a GPU matrix
- *  @param n_rows the number of rows
- *  @param n_cols the number of columns
- *  @param n_slices the number of slices
- *  @param zeros set all elements to 0
- *  @return a wrapper for a GPU matrix
- */
-gcube_t *create_gcube(int n_rows, int n_cols, int n_slices, bool zeros = false);
-
-/** Create a GPU matrix from an OpenCV image
- *  @param cv_image the OpenCV image
- *  @return a wrapper for the GPU matrix
- */
-gcube_t *create_gcube(const cv::Mat &cv_image);
-
-/** Free a GPU matrix
- *  @param pointer to the matrix to free
- */
-void destroy_gcube(gcube_t **img);
-
-/** Grab the representation of the GPU matrix in an OpenCV matrix
- *  @param img the matrix representing the image
- *  @return the OpenCV conversion of the matrix
- */
-cv::Mat gcube2cvMat(gcube_t *img);
-
-/** Load a GPU matrix of an image
- *  @param image_name the name of the image to be loaded
- *  @return a wrapper for the GPU matrix
- */
-gcube_t *load_gcube(const std::string image_name);
-
-void disp_gcube(const std::string window_name, gcube_t *image);
+void disp_gcube(const std::string &window_name, gcube &image);
 
 void disp_wait(void);
 
-gcube_t *gpu_rgb2gray(gcube_t *image);
+gcube gpu_rgb2gray(const gcube &image);
 
-gcube_t *gpu_gray2rgb(gcube_t *image);
+gcube gpu_gray2rgb(const gcube &image);
 
 #endif
 
