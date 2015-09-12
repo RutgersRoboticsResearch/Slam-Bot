@@ -34,14 +34,17 @@ __global__ void GPU_conv2_gen(float *G, float *F, float *H, int F_n_rows, int F_
 }
 
 gcube gpu_conv2(const gcube &F, const gcube &K) {
-  gcube G(F.n_rows, F.n_cols);
-  dim3 blockSize(16, 16, 1);
-  dim3 gridSize((F.n_cols-1)/16+1, (F.n_rows-1)/16+1, 1);
-  // call the GPU kernel
-  GPU_conv2_gen<<<gridSize, blockSize>>>(
-      G.d_pixels, F.d_pixels, K.d_pixels,
-      F.n_rows, F.n_cols, K.n_rows, K.n_cols);
-  checkCudaErrors(cudaGetLastError());
+  gcube G(F.n_rows, F.n_cols, F.n_pixels);
+  for (int k = 0; k < F.n_pixels; k++) {
+    dim3 blockSize(16, 16, 1);
+    dim3 gridSize((F.n_cols-1)/16+1, (F.n_rows-1)/16+1, 1);
+    // call the GPU kernel
+    GPU_conv2_gen<<<gridSize, blockSize>>>(
+        &G.d_pixels[IJK2C(0, 0, k, F.n_rows, F.n_cols)],
+        &F.d_pixels[IJK2C(0, 0, k, F.n_rows, F.n_cols)],
+        K.d_pixels, F.n_rows, F.n_cols, K.n_rows, K.n_cols);
+    checkCudaErrors(cudaGetLastError());
+  }
   return G;
 }
 
@@ -82,14 +85,17 @@ __global__ void GPU_conv2_sym(float *G, float *F, float *Hy, float *Hx, int F_n_
 }
 
 gcube gpu_conv2(const gcube &F, const gcube &V, const gcube &H) {
-  gcube G(F.n_rows, F.n_cols);
-  dim3 blockSize(16, 16, 1);
-  dim3 gridSize((F.n_cols-1)/16+1, (F.n_rows-1)/16+1, 1);
-  // call the GPU kernel
-  GPU_conv2_sym<<<gridSize, blockSize>>>(
-      G.d_pixels, F.d_pixels, V.d_pixels, H.d_pixels,
-      F.n_rows, F.n_cols, V.n_rows, H.n_cols);
-  checkCudaErrors(cudaGetLastError());
+  gcube G(F.n_rows, F.n_cols, F.n_slices);
+  for (int k = 0; k < F.n_slices; k++) {
+    dim3 blockSize(16, 16, 1);
+    dim3 gridSize((F.n_cols-1)/16+1, (F.n_rows-1)/16+1, 1);
+    // call the GPU kernel
+    GPU_conv2_sym<<<gridSize, blockSize>>>(
+        &G.d_pixels[IJK2C(0, 0, k, G.n_rows, G.n_cols)],
+        &F.d_pixels[IJK2C(0, 0, k, F.n_rows, F.n_cols)],
+        V.d_pixels, H.d_pixels, F.n_rows, F.n_cols, V.n_rows, H.n_cols);
+    checkCudaErrors(cudaGetLastError());
+  }
   return G;
 }
 
@@ -133,4 +139,65 @@ void gpu_gauss2(gcube &V, gcube &H, int n, double sigma2) {
   }
   checkCudaErrors(cudaMemcpy(V.d_pixels, h_pixels, n * sizeof(float), cudaMemcpyHostToDevice));
   checkCudaErrors(cudaMemcpy(H.d_pixels, h_pixels, n * sizeof(float), cudaMemcpyHostToDevice));
+}
+
+void gpu_sobel2(gcube &V, gcube &H, bool isVert = true);
+void gpu_sobel2(gcube &V, gcube &H, bool isVert) { // change to vector
+  V.create(3);
+  H.create(3);
+  float V_h_pixels[3];
+  float H_h_pixels[3];
+  if (isVert) {
+    V_h_pixels[0] = 1;
+    V_h_pixels[1] = 2;
+    V_h_pixels[2] = 1;
+    H_h_pixels[0] = 1;
+    H_h_pixels[1] = 0;
+    H_h_pixels[2] = -1;
+  } else {
+    V_h_pixels[0] = 1;
+    V_h_pixels[1] = 0;
+    V_h_pixels[2] = -1;
+    H_h_pixels[0] = 1;
+    H_h_pixels[1] = 2;
+    H_h_pixels[2] = 1;
+  }
+  checkCudaErrors(cudaMemcpy(V.d_pixels, V_h_pixels, 3 * sizeof(float), cudaMemcpyHostToDevice));
+  checkCudaErrors(cudaMemcpy(H.d_pixels, H_h_pixels, 3 * sizeof(float), cudaMemcpyHostToDevice));
+}
+
+std::vector<gcube> gpu_gradient2(const gcube &F) {
+  gcube sobel_v, sobel_h;
+  std::vector<gcube> g;
+  // vertical
+  gpu_sobel2(sobel_v, sobel_h, true);
+  g.push_back(gpu_conv2(F, sobel_v, sobel_h));
+  // horizontal
+  gpu_sobel2(sobel_v, sobel_h, false);
+  g.push_back(gpu_conv2(F, sobel_v, sobel_h));
+  return g;
+}
+
+__global__ void GPU_eucdist(float *C, float *A, float *B, int n_rows, int n_cols) {
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i >= n_rows || j >= n_cols) {
+    return;
+  }
+  C[IJ2C(i, j, n_rows)] = sqrtf(A[IJ2C(i, j, n_rows)] * A[IJ2C(i, j, n_rows)] +
+                                B[IJ2C(i, j, n_rows)] * B[IJ2C(i, j, n_rows)]);
+}
+
+gcube edge2(const gcube &F, int n, double sigma2, bool isSobel, bool isDoG) {
+  // use default
+  gcube V, H;
+  // smooth first
+  gpu_gauss2(V, H, n, sigma2);
+  gcube G = gpu_conv2(F, V, H);
+  // get gradients
+  std::vector<gcube> dxdy = gpu_gradient2(G);
+  // grab the eucdist
+  GPU_eucdist<<<dim3((F.n_cols-1)/16+1,(F.n_rows-1)/16+1,1),dim3(16,16,1)>>>(
+    G.d_pixels, dxdy[0].d_pixels, dxdy[1].d_pixels);
+  return G;
 }
