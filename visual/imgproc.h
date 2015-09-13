@@ -68,7 +68,7 @@ std::vector<arma::cube> gradient2rgb(const arma::cube &F);
  *  @param F the image to apply nmm on
  *  @return a non-maximally suppressed matrix
  */
-arma::mat nmm2(const arma::mat &F, arma::uword nsize = 1, bool min_en = true, bool max_en = true);
+arma::mat nmm2(const arma::mat &F, arma::uword nsize = 1, bool min_en = false, bool max_en = true);
 
 /** Cluster the matrix using the distance vectors in the matrix.
  *  @param S a matrix of data points, where each column is one datapt
