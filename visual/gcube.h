@@ -5,6 +5,7 @@
 
 #include <opencv2/core/core.hpp>
 #include <string>
+#include <vector>
 
 namespace gfill {
   const uint8_t none = 0;
@@ -21,12 +22,14 @@ class gcube {
           uint8_t fill_type = gfill::none);
     gcube(const gcube &gpucube);
     gcube(const std::string &fname);
+    //gcube(const std::vector<float> &list); // add later for C++11 usage
     ~gcube(void);
 
     void create(size_t n_rows,
                 size_t n_cols = 1,
                 size_t n_slices = 1,
                 uint8_t fill_type = gfill::none);
+    void create(const std::vector<float> &list);
 
     gcube &operator=(const gcube &gpucube);
 

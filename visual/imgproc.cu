@@ -141,27 +141,19 @@ void gpu_gauss2(gcube &V, gcube &H, int n, double sigma2) {
   checkCudaErrors(cudaMemcpy(H.d_pixels, h_pixels, n * sizeof(float), cudaMemcpyHostToDevice));
 }
 
-void gpu_sobel2(gcube &V, gcube &H, bool isVert = true);
-void gpu_sobel2(gcube &V, gcube &H, bool isVert) { // change to vector
+void gpu_edgesobel2(gcube &V, gcube &H, bool isVert) { // change to vector
   V.create(3);
   H.create(3);
   float V_h_pixels[3];
   float H_h_pixels[3];
   if (isVert) {
-    V_h_pixels[0] = 1;
-    V_h_pixels[1] = 2;
-    V_h_pixels[2] = 1;
-    H_h_pixels[0] = 1;
-    H_h_pixels[1] = 0;
-    H_h_pixels[2] = -1;
+    V_h_pixels[0] = 1; V_h_pixels[1] = 2; V_h_pixels[2] = 1;
+    H_h_pixels[0] = 1; H_h_pixels[1] = 0; H_h_pixels[2] = -1;
   } else {
-    V_h_pixels[0] = 1;
-    V_h_pixels[1] = 0;
-    V_h_pixels[2] = -1;
-    H_h_pixels[0] = 1;
-    H_h_pixels[1] = 2;
-    H_h_pixels[2] = 1;
+    V_h_pixels[0] = 1; V_h_pixels[1] = 0; V_h_pixels[2] = -1;
+    H_h_pixels[0] = 1; H_h_pixels[1] = 2; H_h_pixels[2] = 1;
   }
+  // small memcpy
   checkCudaErrors(cudaMemcpy(V.d_pixels, V_h_pixels, 3 * sizeof(float), cudaMemcpyHostToDevice));
   checkCudaErrors(cudaMemcpy(H.d_pixels, H_h_pixels, 3 * sizeof(float), cudaMemcpyHostToDevice));
 }
@@ -170,10 +162,10 @@ std::vector<gcube> gpu_gradient2(const gcube &F) {
   gcube sobel_v, sobel_h;
   std::vector<gcube> g;
   // vertical
-  gpu_sobel2(sobel_v, sobel_h, true);
+  gpu_edgesobel2(sobel_v, sobel_h, true);
   g.push_back(gpu_conv2(F, sobel_v, sobel_h));
   // horizontal
-  gpu_sobel2(sobel_v, sobel_h, false);
+  gpu_edgesobel2(sobel_v, sobel_h, false);
   g.push_back(gpu_conv2(F, sobel_v, sobel_h));
   return g;
 }
@@ -184,12 +176,13 @@ __global__ void GPU_eucdist(float *C, float *A, float *B, int n_rows, int n_cols
   if (i >= n_rows || j >= n_cols) {
     return;
   }
-  C[IJ2C(i, j, n_rows)] = sqrtf(A[IJ2C(i, j, n_rows)] * A[IJ2C(i, j, n_rows)] +
-                                B[IJ2C(i, j, n_rows)] * B[IJ2C(i, j, n_rows)]);
+  float dx = A[IJ2C(i, j, n_rows)];
+  float dy = B[IJ2C(i, j, n_rows)];
+  C[IJ2C(i, j, n_rows)] = sqrtf(dx * dx + dy * dy);
 }
 
-gcube edge2(const gcube &F, int n, double sigma2, bool isSobel, bool isDoG) {
-  // use default
+// By default uses the sobel operator
+gcube gpu_edge2(const gcube &F, int n, double sigma2) {
   gcube V, H;
   // smooth first
   gpu_gauss2(V, H, n, sigma2);
@@ -199,5 +192,37 @@ gcube edge2(const gcube &F, int n, double sigma2, bool isSobel, bool isDoG) {
   // grab the eucdist
   GPU_eucdist<<<dim3((F.n_cols-1)/16+1,(F.n_rows-1)/16+1,1),dim3(16,16,1)>>>(
     G.d_pixels, dxdy[0].d_pixels, dxdy[1].d_pixels);
+  return G;
+}
+
+void gpu_cornersobel2(gcube &V, gcube &H) { // change to vector
+  V.create(3);
+  H.create(3);
+  float V_h_pixels[3];
+  float H_h_pixels[3];
+  V_h_pixels[0] = 1; V_h_pixels[1] = -2; V_h_pixels[2] = 1;
+  H_h_pixels[0] = 1; H_h_pixels[1] = -2; H_h_pixels[2] = 1;
+  // small memcpy
+  checkCudaErrors(cudaMemcpy(V.d_pixels, V_h_pixels, 3 * sizeof(float), cudaMemcpyHostToDevice));
+  checkCudaErrors(cudaMemcpy(H.d_pixels, H_h_pixels, 3 * sizeof(float), cudaMemcpyHostToDevice));
+}
+
+// By default uses the sobel operator
+gcube gpu_corner2(const gcube &F, int n, double sigma2) {
+  gcube sobel_v, sobel_h;
+  gcube gpu_cornersobel2(sobel_v, sobel_h);
+  return gpu_conv2(F, sobel_v, sobel_h);
+}
+
+__global__ void GPU_nmm2(float *G, float *F, int n_rows, int n_cols, bool min_en, bool max_en) {
+  
+}
+
+gcube nmm2(const gcube &F, int nsize, bool min_en, bool max_en) {
+  gcube G(F.n_rows, F.n_cols);
+  dim3 blockSize(16, 16, 1);
+  dim3 gridSize((F.n_cols-1)/16+1, (F.n_rows-1)/16+1, 1);
+  GPU_nmm2<<<gridSize, blockSize>>>(G.d_pixels, F.d_pixels, F.n_rows, F.n_cols, min_en, max_en);
+  checkCudaErrors(cudaGetLastError());
   return G;
 }

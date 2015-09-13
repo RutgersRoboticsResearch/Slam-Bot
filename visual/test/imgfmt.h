@@ -3,6 +3,9 @@
 
 #include <string>
 #include <opencv2/core/core.hpp>
+
+#ifdef __NVCC__
+
 #include "gcube.h"
 
 /** Display a gcube onto the screen
@@ -27,4 +30,5 @@ gcube gpu_rgb2gray(const gcube &image);
  */
 gcube gpu_gray2rgb(const gcube &image);
 
+#endif
 #endif
