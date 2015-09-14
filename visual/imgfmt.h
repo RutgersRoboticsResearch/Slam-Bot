@@ -29,14 +29,16 @@ void save_image(const std::string &image_name, const arma::cube &image);
 /** Display an image in an OpenCV window
  *  @param window_name the name of the window to display the image
  *  @param image the image to be displayed (grayscale)
+ *  @param mouseevent (optional) enable mouse events
  */
-void disp_image(const std::string &window_name, const arma::mat &image);
+void disp_image(const std::string &window_name, const arma::mat &image, bool mouseevent = false);
 
 /** Display an image in an OpenCV window
  *  @param window_name the name of the window to display the image
  *  @param image the image to be displayed (rgb)
+ *  @param mouseevent (optional) enable mouse events
  */
-void disp_image(const std::string &window_name, const arma::cube &image);
+void disp_image(const std::string &window_name, const arma::cube &image, bool mouseevent = false);
 
 /** Wait for a key to be pressed before closing the window
  */
