@@ -55,26 +55,15 @@ void draw_rect(cube &I, const vec &v, int x, int y, int width, int height) {
 }
 
 void draw_line(mat &I, double v, int x1, int y1, int x2, int y2) {
-  if (x2 == x1) { // special case
-    if (x1 < 0 || x2 >= (int)I.n_cols) {
-      return; // dont do anything
-    }
-    y1 = LIMIT(y1, 0, (int)I.n_rows-1);
-    y2 = LIMIT(y2, 0, (int)I.n_rows-1);
-    int dy = (y2-y1>=0) ? 1 : -1;
-    for (int i = y1; i != y2; i+=dy) {
-      I(i, x1) = v;
-    }
-    return;
-  }
-  double slope = ((double)y2-(double)y1)/((double)x2-(double)x1);
-  x1 = LIMIT(x1, 0, (int)I.n_cols-1);
-  x2 = LIMIT(x2, 0, (int)I.n_cols-1);
-  int dx = x2-x1 >= 0 ? 1 : -1;
-  for (int j = x1; j != x2; j+=dx) {
-    int i = (int)round((double)(j-x1)*slope)+y1;
-    if (WITHIN(i, 0, (int)I.n_rows-1)) {
-      I(i, j) = v;
+  int dx = x2 - x1;
+  int dy = y2 - y1;
+  int d = MAX(dx, dy);
+  vec xs = linspace<vec>(x1, x2, d * 5);
+  vec ys = linspace<vec>(y1, y2, d * 5);
+  for (int i = 0; i < d * 5; i++) {
+    if (xs(i) >= 0 && xs(i) <= (int)I.n_cols-1 &&
+        ys(i) >= 0 && ys(i) <= (int)I.n_rows-1) {
+      I(ys(i), xs(i)) = v;
     }
   }
 }

@@ -68,18 +68,6 @@ arma::cube cvt_opencv2arma(const cv::Mat &cv_image) {
   return image;
 }
 
-/* put later when GPU gets going
-SDL_Surface *cvt_opencv2sdl(const cv::Mat &cv_image) {
-  SDL_Surface *surface = SDL_CreateRGBSurface(0,
-      cv_image.cols, cv_image.rows, cv_image.channels(), 0, 0, 0, 0);
-  for (int i = 0; i < cv_image.rows; i++) {
-    for (int j = 0; j < cv_image.cols; j++) {
-      uint32_t *pixel = &(((uint32_t *)surface->pixels)[SDL2F(
-    }
-  }
-}
-*/
-
 void disp_image(const std::string &window_name, const arma::mat &image) {
   cv::namedWindow(window_name);
   arma::cube new_image = cvt_gray2rgb(image);
