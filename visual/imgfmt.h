@@ -74,6 +74,11 @@ std::vector<int> disp_get_mouse_pos(const std::string &window_name);
  */
 void disp_wait(void);
 
+/** Wait for a key to be pressed for 30 fps
+ *  @return status of a key pressed
+ */
+int disp_keyPressed(void);
+
 /** Convert the OpenCV image to an arma::cube
  *  @param cv_image the OpenCV image
  *  @return the arma::cube image

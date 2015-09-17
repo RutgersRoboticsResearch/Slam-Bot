@@ -185,6 +185,15 @@ __global__ void GPU_eucdist(float *C, float *A, float *B, int n_rows, int n_cols
   C[IJ2C(i, j, n_rows)] = sqrtf(dx * dx + dy * dy);
 }
 
+__global__ void GPU_minthresh2(float *G, float *F, int n_rows, int n_cols, float minthresh) {
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+  if (i >= n_rows || j >= n_cols) {
+    return;
+  }
+  G[IJ2C(i, j, n_rows)] = F[IJ2C(i, j, n_rows)];
+}
+
 // By default uses the sobel operator
 gcube gpu_edge2(const gcube &F, int n, double sigma2) {
   gcube V, H;
@@ -199,7 +208,8 @@ gcube gpu_edge2(const gcube &F, int n, double sigma2) {
   GPU_eucdist<<<gridSize, blockSize>>>(G.d_pixels, dxdy[0].d_pixels, dxdy[1].d_pixels);
   // do nonmaximal suppression, then thresholding
   gpu_nmm2(G, dxdy[0], dxdy[1]);
-  GPU_lowerthresh2<<<gridSize, blockSize>>>(G.d_pixels, G.d_pixels, 0.4); // TODO: make adaptive thresholding
+  // TODO: make adaptive thresholding
+  GPU_minthresh2<<<gridSize, blockSize>>>(G.d_pixels, G.d_pixels, G.n_rows, G.n_cols, 0.4);
   return G;
 }
 
