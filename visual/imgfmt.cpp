@@ -80,21 +80,21 @@ static char *event_mousemove_name;
 static int event_mousemove_posx;
 static int event_mousemove_posy;
 
-static void MouseEventCallback(int event, int x, int y, void *userdata) {
+static void MouseEventCallback(int event, int x, int y, int flags, void *userdata) {
   switch (event) {
-    case EVENT_LBUTTONDOWN:
+    case cv::EVENT_LBUTTONDOWN:
       event_lbuttondown_sig = 1;
       event_lbuttondown_name = (char *)userdata;
       event_lbuttondown_posx = x;
       event_lbuttondown_posy = y;
       break;
-    case EVENT_RBUTTONDOWN:
+    case cv::EVENT_RBUTTONDOWN:
       event_rbuttondown_sig = 1;
       event_rbuttondown_name = (char *)userdata;
       event_rbuttondown_posx = x;
       event_rbuttondown_posy = y;
       break;
-    case EVENT_MOUSEMOVE:
+    case cv::EVENT_MOUSEMOVE:
       event_mousemove_name = (char *)userdata;
       event_mousemove_posx = x;
       event_mousemove_posx = y;
@@ -107,7 +107,7 @@ void disp_image(const std::string &window_name, const arma::mat &image, bool mou
   if (mouseevent) {
     char *name = new char[window_name.length() + 1];
     strcpy(name, window_name.c_str());
-    setMouseCallback(window_name, MouseEventCallback, name);
+    cv::setMouseCallback(window_name, MouseEventCallback, name);
   }
   arma::cube new_image = cvt_gray2rgb(image);
   cv::imshow(window_name, cvt_arma2opencv(new_image * 255.0));
@@ -118,13 +118,13 @@ void disp_image(const std::string &window_name, const arma::cube &image, bool mo
   if (mouseevent) {
     char *name = new char[window_name.length() + 1];
     strcpy(name, window_name.c_str());
-    setMouseCallback(window_name, MouseEventCallback, name);
+    cv::setMouseCallback(window_name, MouseEventCallback, name);
   }
   cv::imshow(window_name, cvt_arma2opencv(image * 255.0));
 }
 
-std::vector disp_get_lclick_pos(const std::string &window_name) {
-  if (window_name == event_lbuttondown_name) {
+std::vector<int> disp_get_lclick_pos(const std::string &window_name) {
+  if (event_lbuttondown_name && window_name == std::string(event_lbuttondown_name)) {
     return std::vector<int>({ event_lbuttondown_posx, event_lbuttondown_posy });
   } else {
     return std::vector<int>({ 0, 0 });
@@ -132,7 +132,7 @@ std::vector disp_get_lclick_pos(const std::string &window_name) {
 }
 
 bool disp_get_lclicked(const std::string &window_name) {
-  if (window_name == event_lbuttondown_name && event_lbuttondown_sig) {
+  if (event_lbuttondown_name && window_name == std::string(event_lbuttondown_name) && event_lbuttondown_sig) {
     event_lbuttondown_sig = 0;
     return true;
   } else {
@@ -140,8 +140,8 @@ bool disp_get_lclicked(const std::string &window_name) {
   }
 }
 
-std::vector disp_get_rclick_pos(const std::string &window_name) {
-  if (window_name == event_rbuttondown_name) {
+std::vector<int> disp_get_rclick_pos(const std::string &window_name) {
+  if (event_rbuttondown_name && window_name == std::string(event_rbuttondown_name)) {
     return std::vector<int>({ event_rbuttondown_posx, event_rbuttondown_posy });
   } else {
     return std::vector<int>({ 0, 0 });
@@ -149,7 +149,7 @@ std::vector disp_get_rclick_pos(const std::string &window_name) {
 }
 
 bool disp_get_rclicked(const std::string &window_name) {
-  if (window_name == event_rbuttondown_name && event_rbuttondown_sig) {
+  if (event_rbuttondown_name && window_name == std::string(event_rbuttondown_name) && event_rbuttondown_sig) {
     event_rbuttondown_sig = 0;
     return true;
   } else {
@@ -157,9 +157,9 @@ bool disp_get_rclicked(const std::string &window_name) {
   }
 }
 
-std::vector disp_get_mouse_pos(const std::string &window_name) {
-  if (window_name == event_mousemove_name) {
-    return std::vector<int>({ event_mousepos_posx, event_mousepos_posy });
+std::vector<int> disp_get_mouse_pos(const std::string &window_name) {
+  if (event_mousemove_name && window_name == std::string(event_mousemove_name)) {
+    return std::vector<int>({ event_mousemove_posx, event_mousemove_posy });
   } else {
     return std::vector<int>({ 0, 0 });
   }
@@ -167,6 +167,10 @@ std::vector disp_get_mouse_pos(const std::string &window_name) {
 
 void disp_wait(void) {
   cv::waitKey(0);
+}
+
+int disp_keyPressed(void) {
+  return cv::waitKey(30);
 }
 
 cv::Mat cvt_arma2opencv(const arma::cube &image) {

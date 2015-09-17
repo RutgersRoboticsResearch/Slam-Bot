@@ -40,6 +40,36 @@ void disp_image(const std::string &window_name, const arma::mat &image, bool mou
  */
 void disp_image(const std::string &window_name, const arma::cube &image, bool mouseevent = false);
 
+/** Grab the position of a left mouse click
+ *  @param window_name the name of the window to get a click from
+ *  @return the vector of positions where the mouse was clicked
+ */
+std::vector<int> disp_get_lclick_pos(const std::string &window_name);
+
+/** See whether or not the mouse was clicked
+ *  @param window_name the name of the window to get a click from
+ *  @return true if clicked, false otherwise
+ */
+bool disp_get_lclicked(const std::string &window_name);
+
+/** Grab the position of the right mouse click
+ *  @param window_name the name of the window to get a click from
+ *  @return the vector of positions where the mouse was clicked
+ */
+std::vector<int> disp_get_rclick_pos(const std::string &window_name);
+
+/** See whether or not the mouse was clicked
+ *  @param window_name the name of the window to get a click from
+ *  @return true if clicked, false otherwise
+ */
+bool disp_get_rclicked(const std::string &window_name);
+
+/** Get the current mouse position in the window
+ *  @param window_name the name of the window to grab the mouse position from
+ *  @return the vector of positions where the mouse is currently at
+ */
+std::vector<int> disp_get_mouse_pos(const std::string &window_name);
+
 /** Wait for a key to be pressed before closing the window
  */
 void disp_wait(void);
