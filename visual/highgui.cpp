@@ -173,6 +173,10 @@ int disp_keyPressed(void) {
   return cv::waitKey(30);
 }
 
+void disp_close(const std::string &window_name) {
+  cv::destroyWindow(window_name);
+}
+
 cv::Mat cvt_arma2opencv(const arma::cube &image) {
   cv::Mat cv_image;
   switch (image.n_slices) {
