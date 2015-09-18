@@ -1,4 +1,4 @@
-#include "imgfmt.h"
+#include "highgui.h"
 #include "imgproc.h"
 #include <cstdio>
 #include <iostream>
