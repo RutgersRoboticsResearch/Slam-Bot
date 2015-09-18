@@ -9,7 +9,7 @@ using namespace arma;
  * the recommended parameters are 1.0, 0.22, 0.24, 0.0
  */
 
-const double u_distortion[4] = { 1.0, -0.205, -0.21, 0}; // intrinsic parameters?
+const double u_distortion[4] = { 1.0, -0.22, -0.24, 0}; // intrinsic parameters?
 
 double distortionScale(const vec &offset) {
   assert(offset.n_elem == 2);
@@ -37,8 +37,8 @@ mat barrel_distort(const mat &F, double offset_x) {
       double x = (double)(j-r_x) / r_max + offset_x;
       double y = (double)(i-r_y) / r_max;
       double distortion = distortionScale(vec({ y, x }));
-      int _i = (int)round(distortion*(i-r_y)+r_y);
-      int _j = (int)round(distortion*(j-r_x)+r_x);
+      int _i = (int)round(distortion*y*r_max+r_y);
+      int _j = (int)round((distortion*x-offset_x)*r_max+r_x);
       //printf("distortion: %lf\n", distortion);
       //printf("new coord: %d %d \n", _i, _j);
       G(_i, _j) = F(i, j);
