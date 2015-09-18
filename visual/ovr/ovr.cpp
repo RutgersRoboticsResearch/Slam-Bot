@@ -29,7 +29,7 @@ mat barrel_distort(const mat &F, double offset_x) {
   // find the radius of the barrel distortion
   double r_y = F.n_rows / 2;
   double r_x = F.n_cols / 2;
-  double r_max = sqrt((r_x + offset_x) * (r_x + offset_x) + r_y * r_y);
+  double r_max = sqrt((r_x * (1 + abs(offset_x))) * (r_x * (1 + abs(offset_x))) + r_y * r_y);
   // grab the distortionScale
   //printf("grabbing distortion\n");
   for (uword i = 0; i < F.n_rows; i++) {
