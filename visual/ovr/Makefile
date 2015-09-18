@@ -1,5 +1,5 @@
 CXX = g++
-CFLAGS = `pkg-config --cflags opencv` -std=c++11
+CFLAGS = `pkg-config --cflags opencv` -std=c++11 -O3
 LIBS = `pkg-config --libs opencv` -larmadillo
 OBJS = highgui.o imgproc.o ovr.o test.o
 

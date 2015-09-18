@@ -7,20 +7,20 @@ using namespace arma;
 
 int main() {
   // open both left and right cameras
-  cv::VideoCapture left("/dev/video1");
-  cv::VideoCapture right("/dev/video2");
-  assert(!left.isOpened() || !right.isOpened());
+  cv::VideoCapture left(1);
+  cv::VideoCapture right(2);
+  assert(left.isOpened() && right.isOpened());
   // try to identify the different cameras
   left.set(CV_CAP_PROP_FRAME_WIDTH, 640); 
   left.set(CV_CAP_PROP_FRAME_HEIGHT, 480); 
-  left.set(CV_CAP_PROP_FPS, 5); 
+  left.set(CV_CAP_PROP_FPS, 10); 
   right.set(CV_CAP_PROP_FRAME_WIDTH, 640); 
   right.set(CV_CAP_PROP_FRAME_HEIGHT, 480); 
-  right.set(CV_CAP_PROP_FPS, 5);
+  right.set(CV_CAP_PROP_FPS, 10);
   double gain1 = left.get(CV_CAP_PROP_GAIN);
   double gain2 = right.get(CV_CAP_PROP_GAIN);
   bool swapped = false;
-  if (gain1 > 0.5 && gain2 < 0.5) {
+  if (gain1 > 0.6 && gain2 < 0.6) {
     swapped = true;
   }
 //  bool swapped = false;
@@ -34,8 +34,12 @@ int main() {
   cube limg;
   cube rimg;
   cube frame;
+  int offset = 14;
   for (;;) {
-    if (!left.read(frames[0]) || !right.read(frames[1])) {
+    left.read(frames[0]);
+    right.read(frames[1]);
+    if (!frames[0].data || !frames[1].data) {
+      printf("No data...\n");
       continue;
     }
     if (swapped) {
@@ -47,11 +51,9 @@ int main() {
     }
     printf("grabbing section\n");
     // grab sections of image
-    limg = limg(span::all, span(128, 511), span::all);
-    rimg = rimg(span::all, span(128, 511), span::all);
-    printf("before %lld %lld\n", limg.n_slices, rimg.n_slices);
+    limg = limg(span::all, span(128 + offset, 511 + offset), span::all);
+    rimg = rimg(span::all, span(128 - offset, 511 - offset), span::all);
     frame = ovr_image(limg, rimg);
-    printf("after\n");
     disp_image("hud", frame);
     if (disp_keyPressed() >= 0) {
       break;
