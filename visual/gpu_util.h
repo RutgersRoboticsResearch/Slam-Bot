@@ -32,5 +32,24 @@ void __check(T err, const char* const func, const char* const file, const int li
   }
 }
 
+typedef float (*SFP)(float, float);
+
+__global__ void GPU_sum(float *G, float *F, int n);
+
+__global__ void GPU_add(float *H, float *F, float *G, int n_rows, int n_cols);
+__global__ void GPU_sub(float *H, float *F, float *G, int n_rows, int n_cols);
+__global__ void GPU_mul(float *H, float *F, float *G, int n_rows, int n_cols);
+__global__ void GPU_div(float *H, float *F, float *G, int n_rows, int n_cols);
+
+//__global__ void GPU_mmul(float *H, float *G, float *F, int n_rows, int n_cols);
+//__global__ void GPU_trans(float *H, float *F, int n_rows, int n_cols);
+//__global__ void GPU_inv(float *H, float *F, int n_rows, int n_cols);
+//__global__ void GPU_svd(float *U, float *S, float *V, float *A, int n_rows, int n_cols);
+
+__global__ void GPU_abs(float *H, float *F, int n_rows, int n_cols);
+
+//__global__ void GPU_map(float *H, float *F, int n_rows, int n_cols, SFP op);
+//__global__ void GPU_merge(float *H, float *F, float *G, int n_rows, int n_cols, SFP op);
+
 #endif
 #endif

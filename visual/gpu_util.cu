@@ -15,6 +15,15 @@ __global__ void GPU_sum(float *G, float *F, int n) {
   }
 }
 
+__global__ void GPU_add(float *H, float *F, float *G, int n_rows, int n_cols) {
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= n_rows || j >= n_cols) {
+    return;
+  }
+  H[IJ2C(i, j, n_rows)] = F[IJ2C(i, j, n_rows)] + G[IJ2C(i, j, n_rows)];
+}
+
 __global__ void GPU_sub(float *H, float *F, float *G, int n_rows, int n_cols) {
   int i = blockIdx.y * blockDim.y + threadIdx.y;
   int j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -22,6 +31,24 @@ __global__ void GPU_sub(float *H, float *F, float *G, int n_rows, int n_cols) {
     return;
   }
   H[IJ2C(i, j, n_rows)] = F[IJ2C(i, j, n_rows)] - G[IJ2C(i, j, n_rows)];
+}
+
+__global__ void GPU_mul(float *H, float *F, float *G, int n_rows, int n_cols) {
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= n_rows || j >= n_cols) {
+    return;
+  }
+  H[IJ2C(i, j, n_rows)] = F[IJ2C(i, j, n_rows)] * G[IJ2C(i, j, n_rows)];
+}
+
+__global__ void GPU_div(float *H, float *F, float *G, int n_rows, int n_cols) {
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= n_rows || j >= n_cols) {
+    return;
+  }
+  H[IJ2C(i, j, n_rows)] = F[IJ2C(i, j, n_rows)] / G[IJ2C(i, j, n_rows)];
 }
 
 __global__ void GPU_abs(float *H, float *F, int n_rows, int n_cols) {
@@ -32,13 +59,4 @@ __global__ void GPU_abs(float *H, float *F, int n_rows, int n_cols) {
   }
   int v = F[IJ2C(i, j, n_rows)];
   H[IJ2C(i, j, n_rows)] = v * ((v >= 0) - (v < 0));
-}
-
-__global__ void GPU_eemult(float *H, float *F, float *G, int n_rows, int n_cols) {
-  int i = blockIdx.y * blockDim.y + threadIdx.y;
-  int j = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= n_rows || j >= n_cols) {
-    return;
-  }
-  H[IJ2C(i, j, n_rows)] = F[IJ2C(i, j, n_rows)] * G[IJ2C(i, j, n_rows)];
 }
