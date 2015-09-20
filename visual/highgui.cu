@@ -14,6 +14,10 @@ void disp_wait(void) {
   cv::waitKey(0);
 }
 
+int disp_keyPressed(void) {
+  return cv::waitKey(30);
+}
+
 __global__ void GPU_rgb2gray(float *G, float *F, int n_rows, int n_cols) {
   int j = blockIdx.x * blockDim.x + threadIdx.x;
   int i = blockIdx.y * blockDim.y + threadIdx.y;

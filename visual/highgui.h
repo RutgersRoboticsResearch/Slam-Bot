@@ -111,6 +111,8 @@ void disp_gcube(const std::string &window_name, gcube &image);
 
 void disp_wait(void);
 
+int disp_keyPressed(void);
+
 gcube gpu_rgb2gray(const gcube &image);
 
 gcube gpu_gray2rgb(const gcube &image);

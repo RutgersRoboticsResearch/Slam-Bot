@@ -9,13 +9,12 @@ using namespace arma;
  * the recommended parameters are 1.0, 0.22, 0.24, 0.0
  */
 
-const double u_distortion[4] = { 1.0, -0.22, -0.24, 0}; // intrinsic parameters?
+const double u_distortion[4] = { 1.0, 0.22, 0.24, 0}; // intrinsic parameters?
 
 double distortionScale(const vec &offset) {
   assert(offset.n_elem == 2);
   vec offsetSquared = offset % offset;
   double radiusSquared = offsetSquared(0) + offsetSquared(1);
-  //std::cout << offset << std::endl;
   double distortion =
     u_distortion[0] +
     u_distortion[1] * radiusSquared +
@@ -31,7 +30,6 @@ mat barrel_distort(const mat &F, double offset_x) {
   double r_x = F.n_cols / 2;
   double r_max = sqrt((r_x * (1 + abs(offset_x))) * (r_x * (1 + abs(offset_x))) + r_y * r_y);
   // grab the distortionScale
-  //printf("grabbing distortion\n");
   for (uword i = 0; i < F.n_rows; i++) {
     for (uword j = 0; j < F.n_cols; j++) {
       double x = (double)(j-r_x) / r_max + offset_x;
@@ -39,9 +37,7 @@ mat barrel_distort(const mat &F, double offset_x) {
       double distortion = distortionScale(vec({ y, x }));
       int _i = (int)round(distortion*y*r_max+r_y);
       int _j = (int)round((distortion*x-offset_x)*r_max+r_x);
-      //printf("distortion: %lf\n", distortion);
-      //printf("new coord: %d %d \n", _i, _j);
-      G(_i, _j) = F(i, j);
+      G(i, j) = F(_i, _j);
     }
   }
   return G;

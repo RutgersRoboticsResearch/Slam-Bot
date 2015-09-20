@@ -3,58 +3,58 @@
 #include <opencv2/highgui/highgui.hpp>
 #include "ovr.h"
 
-using namespace arma;
+//using namespace arma;
+
+// can be 30-45ish
+#define DCAMFPS 30
 
 int main() {
-  // open both left and right cameras
-  cv::VideoCapture left(1);
-  cv::VideoCapture right(2);
+/*  // open both left and right cameras
+  cv::VideoCapture left(0);
+  cv::VideoCapture right(1);
   assert(left.isOpened() && right.isOpened());
   // try to identify the different cameras
   left.set(CV_CAP_PROP_FRAME_WIDTH, 640); 
   left.set(CV_CAP_PROP_FRAME_HEIGHT, 480); 
-  left.set(CV_CAP_PROP_FPS, 10); 
+  left.set(CV_CAP_PROP_FPS, DCAMFPS); 
   right.set(CV_CAP_PROP_FRAME_WIDTH, 640); 
   right.set(CV_CAP_PROP_FRAME_HEIGHT, 480); 
-  right.set(CV_CAP_PROP_FPS, 10);
+  right.set(CV_CAP_PROP_FPS, DCAMFPS);
   double gain1 = left.get(CV_CAP_PROP_GAIN);
   double gain2 = right.get(CV_CAP_PROP_GAIN);
   bool swapped = false;
   if (gain1 > 0.6 && gain2 < 0.6) {
     swapped = true;
   }
-//  bool swapped = false;
-
+*/
   // grab and display the frame
-  printf("Starting hud\n");
   cv::namedWindow("hud");
   cv::Mat frames[2];
-//  frames[0] = cv::imread("left_image.png");
-//  frames[1] = cv::imread("right_image.png");
-  cube limg;
-  cube rimg;
-  cube frame;
-  int offset = 14;
+  frames[0] = cv::imread("stereo-images/left_image.png");
+  frames[1] = cv::imread("stereo-images/right_image.png");
+  gcube limg;
+  gcube rimg;
+  gcube combined;
+  double offset = 0.15;
   for (;;) {
-    left.read(frames[0]);
-    right.read(frames[1]);
+//    left.read(frames[0]);
+//    right.read(frames[1]);
     if (!frames[0].data || !frames[1].data) {
       printf("No data...\n");
       continue;
     }
-    if (swapped) {
-      limg = cvt_opencv2arma(frames[1]) / 255.0;
-      rimg = cvt_opencv2arma(frames[0]) / 255.0;
+    // statically mapped numbers - assumption is that the frame is going to be 480x640 big
+    /*if (swapped) {
+      limg.create(frames[1], 128, 511, 0, 480);
+      rimg.create(frames[0], 128, 511, 0, 480);
     } else {
-      limg = cvt_opencv2arma(frames[0]) / 255.0;
-      rimg = cvt_opencv2arma(frames[1]) / 255.0;
-    }
-    printf("grabbing section\n");
-    // grab sections of image
-    limg = limg(span::all, span(128 + offset, 511 + offset), span::all);
-    rimg = rimg(span::all, span(128 - offset, 511 - offset), span::all);
-    frame = ovr_image(limg, rimg);
-    disp_image("hud", frame);
+      limg.create(frames[0], 128, 511, 0, 480);
+      rimg.create(frames[1], 128, 511, 0, 480);
+    }*/
+    limg.create(frames[0]);
+    rimg.create(frames[1]);
+    combined = ovr_image(limg, rimg, offset); // waste copy
+    disp_gcube("hud", combined);
     if (disp_keyPressed() >= 0) {
       break;
     }

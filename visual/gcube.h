@@ -39,6 +39,7 @@ class gcube {
     // opencv compatibility
     gcube(cv::Mat &cvMat);
     void create(const cv::Mat &cvMat);
+    void create(const cv::Mat &cvMat, int x1, int x2, int y1, int y2);
     cv::Mat cv_mat(void);
     gcube &operator=(const cv::Mat &cvMat);
 

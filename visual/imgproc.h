@@ -175,6 +175,20 @@ gcube gpu_conv2(const gcube &F, const gcube &V, const gcube &H);
 gcube gpu_gauss2(int n, double sigma2);
 void gpu_gauss2(gcube &V, gcube &H, int n, double sigma2);
 
+void gpu_edgesobel2(gcube &V, gcube &H, bool isVert);
+
+std::vector<gcube> gpu_gradient2(const gcube &F);
+
+gcube gpu_edge2(const gcube &F, int n, double sigma2);
+
+void gpu_cornersobel2(gcube &V, gcube &H);
+
+gcube gpu_corner2(const gcube &F, int n, double sigma2);
+
+gcube gpu_nmm2(const gcube &F, const gcube &Fx, const gcube &Fy);
+
+gcube gpu_imresize2(const gcube &A, int m, int n);
+
 #endif
 
 #endif

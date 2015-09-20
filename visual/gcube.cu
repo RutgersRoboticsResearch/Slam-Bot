@@ -58,7 +58,7 @@ void gcube::create(size_t n_rows, size_t n_cols, size_t n_slices, uint8_t fill_t
       case gfill::none:
         break;
       case gfill::zeros:
-        checkCudaErrors(cudaMemset(&this->d_pixels, 0, this->n_elem * sizeof(float)));
+        checkCudaErrors(cudaMemset(this->d_pixels, 0, this->n_elem * sizeof(float)));
         break;
       case gfill::ones:
         GPU_map_assign<<<(this->n_elem-1) / 128 + 1, 128>>>(this->d_pixels, 1, this->n_elem);
@@ -99,6 +99,22 @@ void gcube::create(const cv::Mat &cvMat) {
       cv::Vec3b color = cvMat.at<cv::Vec3b>(i, j);
       for (int k = 0; k < this->n_slices; k++) {
         h_pixels[IJK2C(i, j, k, this->n_rows, this->n_cols)] = (float)color[k] / 255.0f;
+      }
+    }
+  }
+  checkCudaErrors(cudaMemcpy(this->d_pixels, h_pixels, this->n_elem * sizeof(float), cudaMemcpyHostToDevice));
+  free(h_pixels);
+}
+
+void gcube::create(const cv::Mat &cvMat, int x1, int x2, int y1, int y2) {
+  assert(x1 <= x2 && y1 <= y2 && x2 <= cvMat.cols && y2 <= cvMat.rows);
+  this->create(y2 - y1, x2 - x1, cvMat.channels(), gfill::none);
+  float *h_pixels = new float[this->n_elem];
+  for (int i = y1; i < y2; i++) {
+    for (int j = x1; j < x2; j++) {
+      cv::Vec3b color = cvMat.at<cv::Vec3b>(i, j);
+      for (int k = 0; k < this->n_slices; k++) {
+        h_pixels[IJK2C(i - y1, j - x1, k, this->n_rows, this->n_cols)] = (float)color[k] / 255.0f;
       }
     }
   }
