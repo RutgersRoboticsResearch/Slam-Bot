@@ -79,6 +79,11 @@ void disp_wait(void);
  */
 int disp_keyPressed(void);
 
+/** Close a window of an image
+ *  @param window_name the name of the window to close
+ */
+void disp_close(const std::string &window_name);
+
 /** Convert the OpenCV image to an arma::cube
  *  @param cv_image the OpenCV image
  *  @return the arma::cube image

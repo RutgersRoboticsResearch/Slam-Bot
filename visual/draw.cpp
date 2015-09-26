@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cassert>
 #include "draw.h"
 
 #define MIN(a, b) (((a)<(b))?(a):(b))
@@ -54,9 +55,13 @@ void draw_rect(cube &I, const vec &v, int x, int y, int width, int height) {
 }
 
 void draw_line(mat &I, double v, int x1, int y1, int x2, int y2) {
+  if (x1 == x2 && y1 == y2) {
+    printf("same coord\n");
+    return;
+  }
   int dx = x2 - x1;
   int dy = y2 - y1;
-  int d = MAX(dx, dy);
+  int d = MAX(abs(dx), abs(dy));
   vec xs = linspace<vec>(x1, x2, d * 5);
   vec ys = linspace<vec>(y1, y2, d * 5);
   for (int i = 0; i < d * 5; i++) {
