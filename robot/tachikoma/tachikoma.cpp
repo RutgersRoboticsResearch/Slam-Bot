@@ -30,43 +30,53 @@
 #define NCOMCNTR  4
 
 using namespace arma;
+using namespace std;
+using json = nlohmann::json;
 
-static int limit(int value, int min_value, int max_value);
+//static int limit(int value, int min_value, int max_value);
 static double limitf(double value, double min_value, double max_value);
 static double cos_rule_angle(double A, double B, double C);
 //static double cos_rule_distance(double A, double B, double c);
-static double pot2rad(int reading, int devid);
-static int rad2pot(double radians, int devid);
-static double enc2rad(int reading);
+//static double pot2rad(int reading, int devid);
+//static int rad2pot(double radians, int devid);
+//static double enc2rad(int reading);
 //static int rad2enc(double radians);
-static int rad2wheel(double vel);
+//static int rad2wheel(double vel);
+static double enc_transform(int jointid, double minv, double maxv, int reversed, double value);
 
 /** CLASS FUNCTIONS **/
 
 Tachikoma::Tachikoma(void) : BaseRobot(TACHIKOMA) {
-  this->leg_write = zeros<mat>(NUM_JOINTS * 2 + 1, NUM_LEGS);
-  this->leg_read = zeros<mat>(NUM_JOINTS + 1, NUM_LEGS);
-  this->leg_positions = zeros<mat>(3, NUM_LEGS);
+  this->leg_write = zeros<mat>(NUM_LEGS, NUM_JOINTS * 2 + 1);
+  this->leg_read = zeros<mat>(NUM_LEGS, NUM_JOINTS + 1);
+  this->leg_fback = zeros<mat>(NUM_LEGS, NUM_JOINTS * 2 + 1);
+  this->leg_positions = zeros<mat>(NUM_LEGS, 3);
+  this->leg_min = zeros<mat>(NUM_LEGS, NUM_JOINTS);
+  this->leg_max = zeros<mat>(NUM_LEGS, NUM_JOINTS);
+  this->leg_rev = zeros<umat>(NUM_LEGS, NUM_JOINTS);
+  this->calibration_loaded = false;
+  this->instruction_activate = 0;
   if (this->connect()) {
     this->reset();
     this->send(
-      zeros<mat>(NUM_JOINTS, NUM_LEGS),
-      zeros<mat>(NUM_JOINTS, NUM_LEGS),
+      zeros<mat>(NUM_LEGS, NUM_JOINTS),
+      zeros<mat>(NUM_LEGS, NUM_JOINTS),
       zeros<vec>(NUM_LEGS),
-      zeros<mat>(1, 1)); // change arm specification
+      zeros<mat>(1, 1), false, false); // change arm specification
   }
-  this->thigh_signature = 0;
+  printf("[TACHIKOMA] Connected.\n");
 }
 
 Tachikoma::~Tachikoma(void) {
   if (this->connected()) {
     this->send(
-      zeros<mat>(NUM_JOINTS, NUM_LEGS),
-      zeros<mat>(NUM_JOINTS, NUM_LEGS),
+      zeros<mat>(NUM_LEGS, NUM_JOINTS),
+      zeros<mat>(NUM_LEGS, NUM_JOINTS),
       zeros<vec>(NUM_LEGS),
-      zeros<mat>(1, 1)); // change arm specification
+      zeros<mat>(1, 1), false, false); // change arm specification
     this->reset();
     this->disconnect();
+    printf("[TACHIKOMA] Disconnected.\n");
   }
 }
 
@@ -82,6 +92,9 @@ int Tachikoma::numconnected(void) {
 void Tachikoma::reset(void) {
   this->leg_write.zeros();
   this->leg_read.zeros();
+  this->leg_fback.zeros();
+  // be cautious about the following line:
+  // memset(this->thigh_signature, 0, sizeof(int) * 4);
 }
 
 void Tachikoma::send(const mat &leg_theta,
@@ -90,53 +103,37 @@ void Tachikoma::send(const mat &leg_theta,
                      const mat &arm_theta,
                      bool leg_theta_act,
                      bool leg_vel_act) {
-  assert(leg_theta.n_rows == NUM_JOINTS && leg_theta.n_cols == NUM_LEGS);
-  assert(leg_vel.n_rows == NUM_JOINTS && leg_vel.n_cols == NUM_LEGS);
+  assert(leg_theta.n_rows == NUM_LEGS && leg_theta.n_cols == NUM_JOINTS);
+  assert(leg_vel.n_rows == NUM_LEGS && leg_vel.n_cols == NUM_JOINTS);
   assert(wheels.n_elem == NUM_LEGS);
+
   int devid;
   int legid1;
   int legid2;
-  double leg[NUM_LEGS][NUM_JOINTS * 2 + 1];
+  double leg[NUM_LEGS][NUM_JOINTS * 2 + 1]; // njoints x (position, velocity) and wheel
 
   // set up the leg matrix (safety checks)
-  for (uword j = 0; j < NUM_LEGS; j++) {
-    for (uword i = 0; i < NUM_JOINTS; i++) {
-      if (leg_theta_act) {
-        leg[j][i] = limitf(leg_theta(i, j), -M_PI, M_PI);
-        if (leg[j][i] == -M_PI) { // special case
-          leg[j][i] = M_PI;
-        }
+  for (uword i = 0; i < NUM_LEGS; i++) {
+    for (uword j = 0; j < NUM_JOINTS; j++) {
+      leg[i][j + WAIST_POS] = limitf(leg_theta(i, j), -M_PI, M_PI);
+      if (leg[i][j + WAIST_POS] == -M_PI) { // special case
+        leg[i][j + WAIST_POS] = M_PI;
       }
-      if (leg_vel_act) {
-        // velocity index hack (i + WAIST_VEL)
-        leg[j][i + WAIST_VEL] = limitf(leg_vel(i, j), -1.0, 1.0);
-      } else {
-        leg[j][i + WAIST_VEL] = 0;
+      // use calibration definitions if they exist
+      if (this->calibrated()) {
+        leg[i][j + WAIST_POS] = enc_transform(j,
+          this->leg_min(i, j), this->leg_max(i, j),
+          this->leg_rev(i, j), leg[i][j + WAIST_POS]);
       }
+      // velocity index hack (i + WAIST_VEL)
+      leg[i][j + WAIST_VEL] = limitf(leg_vel(i, j), -1.0, 1.0);
     }
-    leg[j][WHEEL_VEL] = limitf(wheels(j), -1.0, 1.0);
-  }
-
-  // communication signature change for thighs
-  bool thigh_change[NUM_LEGS][2];
-  thigh_change[UL][0] = this->leg_write(THIGH_POS, UL) != leg[UL][THIGH_POS];
-  thigh_change[UR][0] = this->leg_write(THIGH_POS, UR) != leg[UR][THIGH_POS];
-  thigh_change[DL][0] = this->leg_write(THIGH_POS, DL) != leg[DL][THIGH_POS];
-  thigh_change[DR][0] = this->leg_write(THIGH_POS, DR) != leg[DR][THIGH_POS];
-  thigh_change[UL][1] = this->leg_write(THIGH_VEL, UL) != leg[UL][THIGH_VEL];
-  thigh_change[UR][1] = this->leg_write(THIGH_VEL, UR) != leg[UR][THIGH_VEL];
-  thigh_change[DL][1] = this->leg_write(THIGH_VEL, DL) != leg[DL][THIGH_VEL];
-  thigh_change[DR][1] = this->leg_write(THIGH_VEL, DR) != leg[DR][THIGH_VEL];
-  for (int i = 0; i < 8; i++) {
-    if (thigh_change[i / 2][i % 2]) {
-      // size 4 statically defined due to # of communication pins
-      this->thigh_signature = (this->thigh_signature + 1) % NCOMCNTR;
-      break;
-    }
+    leg[i][WHEEL_VEL] = limitf(wheels(i), -1.0, 1.0);
   }
 
   // instruction char representing action to undertake (global)
-  char instr_activate = 0x80 | (leg_theta_act ? 0x01 : 0x00) | (leg_vel_act ? 0x02 : 0x00);
+  char instr_activate = 0x80 | ((leg_theta_act && this->calibrated()) ? 0x01 : 0x00) |
+                        (leg_vel_act ? 0x02 : 0x00);
 
   // write to device (only for legs for now)
   char msg[WBUFSIZE];
@@ -147,21 +144,29 @@ void Tachikoma::send(const mat &leg_theta,
         // waist
         case WAIST_LEFT:
         case WAIST_RIGHT:
-          // speed hack (will change with definition changes)
-          legid1 = devid - 1;
-          legid2 = devid + 1;
-          if (this->leg_write(WAIST_POS, legid1) != leg[legid1][WAIST_POS] ||
-              this->leg_write(WAIST_POS, legid2) != leg[legid2][WAIST_POS] ||
-              this->leg_write(WAIST_VEL, legid1) != leg[legid1][WAIST_VEL] ||
-              this->leg_write(WAIST_VEL, legid2) != leg[legid2][WAIST_VEL]) {
-            this->leg_write(WAIST_POS, legid1) = leg[legid1][WAIST_POS];
-            this->leg_write(WAIST_POS, legid2) = leg[legid2][WAIST_POS];
-            this->leg_write(WAIST_VEL, legid1) = leg[legid1][WAIST_VEL];
-            this->leg_write(WAIST_VEL, legid2) = leg[legid2][WAIST_VEL];
-            sprintf(msg, "[%c %lf %lf %d %d]\n",
+          switch (devid) {
+            case WAIST_LEFT:
+              legid1 = UL;
+              legid2 = DL;
+              break;
+            case WAIST_RIGHT:
+              legid1 = DR;
+              legid2 = UR;
+              break;
+          }
+          if (this->leg_write(legid1, WAIST_POS) != leg[legid1][WAIST_POS] ||
+              this->leg_write(legid2, WAIST_POS) != leg[legid2][WAIST_POS] ||
+              this->leg_write(legid1, WAIST_VEL) != leg[legid1][WAIST_VEL] ||
+              this->leg_write(legid2, WAIST_VEL) != leg[legid2][WAIST_VEL] ||
+              this->instruction_activate != instr_activate) {
+            this->leg_write(legid1, WAIST_POS) = leg[legid1][WAIST_POS];
+            this->leg_write(legid2, WAIST_POS) = leg[legid2][WAIST_POS];
+            this->leg_write(legid1, WAIST_VEL) = leg[legid1][WAIST_VEL];
+            this->leg_write(legid2, WAIST_VEL) = leg[legid2][WAIST_VEL];
+            sprintf(msg, "[%d %d %d %d %d]\n",
               instr_activate,
-              leg[legid1][WAIST_POS],
-              leg[legid2][WAIST_POS],
+              (int)(leg[legid1][WAIST_POS]),
+              (int)(leg[legid2][WAIST_POS]),
               (int)(leg[legid1][WAIST_VEL] * 255.0),
               (int)(leg[legid2][WAIST_VEL] * 255.0));
             serial_write(this->connections[i], msg);
@@ -169,41 +174,20 @@ void Tachikoma::send(const mat &leg_theta,
           break;
 
         // thigh
-        case THIGH_UP:
-        case THIGH_LEFT:
-        case THIGH_RIGHT:
-        case THIGH_DOWN:
-          switch (devid) {
-            case THIGH_UP:
-              legid1 = UL;
-              legid2 = UR;
-              break;
-            case THIGH_LEFT:
-              legid1 = DL;
-              legid2 = UL;
-              break;
-            case THIGH_RIGHT:
-              legid1 = UR;
-              legid2 = DR;
-              break;
-            case THIGH_DOWN:
-              legid1 = DR;
-              legid2 = DL;
-              break;
-          }
-          if (thigh_change[legid1][0] || thigh_change[legid2][0] ||
-              thigh_change[legid1][1] || thigh_change[legid2][1]) {
-            this->leg_write(THIGH_POS, legid1) = leg[legid1][THIGH_POS];
-            this->leg_write(THIGH_POS, legid2) = leg[legid2][THIGH_POS];
-            this->leg_write(THIGH_VEL, legid1) = leg[legid1][THIGH_VEL];
-            this->leg_write(THIGH_VEL, legid2) = leg[legid2][THIGH_VEL];
-            sprintf(msg, "[%c %c %lf %lf %d %d]\n",
+        case THIGH_UL:
+        case THIGH_UR:
+        case THIGH_DL:
+        case THIGH_DR:
+          legid1 = devid - THIGH_UL;
+          if (this->leg_write(legid1, THIGH_POS) != leg[legid1][THIGH_POS] ||
+              this->leg_write(legid1, THIGH_VEL) != leg[legid1][THIGH_VEL] ||
+              this->instruction_activate != instr_activate) {
+            this->leg_write(legid1, THIGH_POS) = leg[legid1][THIGH_POS];
+            this->leg_write(legid1, THIGH_VEL) = leg[legid1][THIGH_VEL];
+            sprintf(msg, "[%d %d %d]\n",
               instr_activate,
-              this->thigh_signature,
-              leg[legid1][THIGH_POS],
-              leg[legid2][THIGH_POS],
-              (int)(leg[legid1][THIGH_VEL] * 255.0),
-              (int)(leg[legid2][THIGH_VEL] * 255.0));
+              (int)(leg[legid1][THIGH_POS]),
+              (int)(leg[legid1][THIGH_VEL] * 255.0));
             serial_write(this->connections[i], msg);
           }
           break;
@@ -215,13 +199,14 @@ void Tachikoma::send(const mat &leg_theta,
         case KNEE_DR:
           // speed hack (will change with definition changes)
           legid1 = devid - KNEE_UL;
-          if (this->leg_write(KNEE_POS, legid1) != leg[legid1][KNEE_POS] ||
-              this->leg_write(KNEE_VEL, legid1) != leg[legid1][KNEE_VEL]) {
-            this->leg_write(KNEE_POS, legid1) = leg[legid1][KNEE_POS];
-            this->leg_write(KNEE_VEL, legid1) = leg[legid1][KNEE_VEL];
-            sprintf(msg, "[%c %lf %d]\n",
+          if (this->leg_write(legid1, KNEE_POS) != leg[legid1][KNEE_POS] ||
+              this->leg_write(legid1, KNEE_VEL) != leg[legid1][KNEE_VEL] ||
+              this->instruction_activate != instr_activate) {
+            this->leg_write(legid1, KNEE_POS) = leg[legid1][KNEE_POS];
+            this->leg_write(legid1, KNEE_VEL) = leg[legid1][KNEE_VEL];
+            sprintf(msg, "[%d %d %d]\n",
               instr_activate,
-              leg[legid1][KNEE_POS],
+              (int)(leg[legid1][KNEE_POS]),
               (int)(leg[legid1][KNEE_VEL] * 255.0));
             serial_write(this->connections[i], msg);
           }
@@ -234,8 +219,8 @@ void Tachikoma::send(const mat &leg_theta,
         case WHEEL_DR:
           // speed hack (will change with definition changes)
           legid1 = devid - WHEEL_UL;
-          if (this->leg_write(WHEEL_VEL, legid1) != leg[legid1][WHEEL_VEL]) {
-            this->leg_write(WHEEL_VEL, legid1) = leg[legid1][WHEEL_VEL];
+          if (this->leg_write(legid1, WHEEL_VEL) != leg[legid1][WHEEL_VEL]) {
+            this->leg_write(legid1, WHEEL_VEL) = leg[legid1][WHEEL_VEL];
             sprintf(msg, "[%d]\n",
               (int)(leg[legid1][WHEEL_VEL] * 255.0));
             serial_write(this->connections[i], msg);
@@ -246,6 +231,9 @@ void Tachikoma::send(const mat &leg_theta,
       }
     }
   }
+
+  // after sending all the new components, update current state of robot
+  this->instruction_activate = instr_activate;
 }
 
 vec Tachikoma::recv(mat &leg_sensors, mat &leg_feedback) {
@@ -254,10 +242,9 @@ vec Tachikoma::recv(mat &leg_sensors, mat &leg_feedback) {
   int legid1;
   int legid2;
   int enc;
-  double sensor1;
-  double sensor2;
+  int sensor1;
+  int sensor2;
   int dummy[2];
-  leg_feedback = mat(5, 4, fill::zeros);
   // read from device
   for (int i = 0; i < (int)this->connections.size(); i++) {
     if (this->ids[i] > 0 && this->ids[i] <= 16) {
@@ -267,42 +254,36 @@ vec Tachikoma::recv(mat &leg_sensors, mat &leg_feedback) {
         case WAIST_LEFT:
         case WAIST_RIGHT:
           if ((msg = serial_read(this->connections[i]))) {
-            legid1 = devid - 1; // hack for speed
-            legid2 = devid + 1;
-            sscanf(msg, "[%d %d %d %lf %lf]\n", &this->ids[i],
-              &dummy[0], &dummy[1], &sensor1, &sensor2);
-            this->leg_read(WAIST_POS, legid1) = sensor1;
-            this->leg_read(WAIST_POS, legid2) = sensor2;
-            leg_feedback(WAIST_POS, legid1) = dummy[0];
-            leg_feedback(WAIST_POS, legid2) = dummy[1];
+            switch (devid) {
+              case WAIST_LEFT:
+                legid1 = UL;
+                legid2 = DL;
+                break;
+              case WAIST_RIGHT:
+                legid1 = DR;
+                legid2 = UR;
+                break;
+            }
+            sscanf(msg, "[%d %d %d %d %d]\n", &this->ids[i],
+              &sensor1, &sensor2, &dummy[0], &dummy[1]);
+            this->leg_read(legid1, WAIST_POS) = sensor1;
+            this->leg_read(legid2, WAIST_POS) = sensor2;
+            this->leg_fback(legid1, WAIST_POS) = dummy[0];
+            this->leg_fback(legid2, WAIST_POS) = dummy[1];
           }
           break;
 
         // thigh
-        case THIGH_UP:
-        case THIGH_LEFT:
-        case THIGH_RIGHT:
-        case THIGH_DOWN:
-          switch (devid) {
-            case THIGH_UP:
-              legid1 = UR;
-              break;
-            case THIGH_LEFT:
-              legid1 = UL;
-              break;
-            case THIGH_RIGHT:
-              legid1 = DR;
-              break;
-            case THIGH_DOWN:
-              legid1 = DL;
-              break;
-          }
+        case THIGH_UL:
+        case THIGH_UR:
+        case THIGH_DL:
+        case THIGH_DR:
+          legid1 = devid - THIGH_UL; // hack for speed
           if ((msg = serial_read(this->connections[i]))) {
-            sscanf(msg, "[%d %d %d %lf]\n", &this->ids[i],
-              &dummy[0], &dummy[1], &sensor1);
-            this->leg_read(THIGH_POS, legid1) = sensor1;
-            leg_feedback(THIGH_POS, legid1) = dummy[0];
-            leg_feedback(THIGH_POS, legid1+1) = dummy[1];
+            sscanf(msg, "[%d %d %d]\n", &this->ids[i],
+              &sensor1, &dummy[0]);
+            this->leg_read(legid1, THIGH_POS) = sensor1;
+            this->leg_fback(legid1, THIGH_POS) = dummy[0];
           }
           break;
 
@@ -311,12 +292,13 @@ vec Tachikoma::recv(mat &leg_sensors, mat &leg_feedback) {
         case KNEE_UR:
         case KNEE_DL:
         case KNEE_DR:
+          legid1 = devid - KNEE_UL; // hack for speed
           if ((msg = serial_read(this->connections[i]))) {
             legid1 = devid - KNEE_UL; // hack for speed
-            sscanf(msg, "[%d %d %lf]\n", &this->ids[i],
-              &dummy[0], &sensor1);
-            this->leg_read(KNEE_POS, legid1) = sensor1;
-            leg_feedback(KNEE_POS, legid1) = dummy[0];
+            sscanf(msg, "[%d %d %d]\n", &this->ids[i],
+              &sensor1, &dummy[0]);
+            this->leg_read(legid1, KNEE_POS) = sensor1;
+            this->leg_fback(legid1, KNEE_POS) = dummy[0];
           }
           break;
 
@@ -328,9 +310,9 @@ vec Tachikoma::recv(mat &leg_sensors, mat &leg_feedback) {
           if ((msg = serial_read(this->connections[i]))) {
             legid1 = devid - WHEEL_UL; // hack for speed
             sscanf(msg, "[%d %d %d]\n", &this->ids[i],
-              &dummy[0], &enc);
-            this->leg_read(WHEEL_VEL, legid1) = (double)enc;
-            leg_feedback(WHEEL_VEL, legid1) = dummy[0];
+              &enc, &dummy[0]);
+            this->leg_read(legid1, WHEEL_VEL) = (double)enc;
+            this->leg_fback(legid1, WHEEL_VEL) = dummy[0];
           }
           break;
         default:
@@ -339,7 +321,31 @@ vec Tachikoma::recv(mat &leg_sensors, mat &leg_feedback) {
     }
   }
   leg_sensors = this->leg_read;
+  leg_feedback = this->leg_fback;
   return vectorise(this->leg_read);
+}
+
+void Tachikoma::set_calibration_params(json cp) {
+  vector<string> legnames = { "ul", "ur", "dl", "dr" };
+  vector<int> legids = { UL, UR, DL, DR };
+  vector<string> jointnames = { "waist", "thigh", "knee" };
+  vector<int> jointids = { WAIST, THIGH, KNEE };
+  for (int i = 0; i < NUM_LEGS; i++) {
+    for (int j = 0; j < NUM_JOINTS; j++) {
+      string legname = legnames[i];
+      int legid = legids[i];
+      string jointname = jointnames[j];
+      int jointid = jointids[j];
+      this->leg_min(legid, jointid) = cp[legname][jointname]["min"];
+      this->leg_max(legid, jointid) = cp[legname][jointname]["max"];
+      this->leg_rev(legid, jointid) = cp[legname][jointname]["reversed"] ? 1 : 0;
+    }
+  }
+  this->calibration_loaded = true;
+}
+
+bool Tachikoma::calibrated(void) {
+  return this->calibration_loaded;
 }
 
 vec Tachikoma::leg_fk_solve(const vec &enc, int legid) {
@@ -409,7 +415,7 @@ vec Tachikoma::leg_ik_solve(const vec &pos, const vec &enc, int legid) {
  *    maximum value
  *  @return the limited value
  */
-static int limit(int value, int min_value, int max_value) {
+/*static int limit(int value, int min_value, int max_value) {
   if (value < min_value) {
     return min_value;
   } else if (value > max_value) {
@@ -417,7 +423,7 @@ static int limit(int value, int min_value, int max_value) {
   } else {
     return value;
   }
-}
+}*/
 
 /** Limit an a value between a range (double)
  *  @param value
@@ -466,25 +472,36 @@ static double cos_rule_angle(double A, double B, double C) {
 
 /** Potentiometer transformation rules
  */
-static double pot2rad(int reading, int devid) {
+/*static double pot2rad(int reading, int devid) {
   // for now the reading doesn't (really) matter
   return (double)reading;
 }
 
 static int rad2pot(double radians, int devid) {
   return (int)round(radians);
-}
+}*/
 
 /** Encoder transformation rules
  */
-static double enc2rad(int reading) {
+/*static double enc2rad(int reading) {
   return (double)reading * 4.0;
-}
+}*/
 
 //static int rad2enc(double radians) {
 //  return (int)round(radians / 4.0);
 //}
 
-static int rad2wheel(double vel) {
+/*static int rad2wheel(double vel) {
   return limit((int)(vel * 255.0), 0, 255);
+}*/
+
+static double enc_transform(int jointid, double minv, double maxv, int reversed, double value) {
+  double enc_range = maxv - minv;
+  double rad[] = { -M_PI_4, M_PI_4 }; // range is only -90 to 90
+  value = limitf(value, rad[0], rad[1]);
+  double ratio = enc_range / (rad[1] - rad[0]);
+  if (reversed) {
+    value = -value; // this only works since range is -90 to 90
+  }
+  return (value - rad[0]) * ratio + minv;
 }

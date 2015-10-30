@@ -2,6 +2,8 @@
 #define __TK_TACHIKOMA_H__
 
 #include <armadillo>
+#include <string>
+#include <njson/json.hpp>
 #include "baserobot.h"
 
 class Tachikoma : public BaseRobot {
@@ -36,11 +38,12 @@ class Tachikoma : public BaseRobot {
               const arma::mat &leg_vel,
               const arma::vec &wheels,
               const arma::mat &arm_theta,
-              bool leg_theta_act = true,
-              bool leg_vel_act = false);
+              bool leg_theta_act = false,
+              bool leg_vel_act = true);
 
     /** Receive a matrix of sensor values from the legs, indicating (for now) angles and touch
      *  @param leg_sensors a generic 4x4 matrix representing the theta and distances of the legs
+     *  @param leg_feedback a generic 4x4 matrix representing the vectors of the motors
      *  @return for compatability, returns a vector of all sensor values
      */
     arma::vec recv(arma::mat &leg_sensors, arma::mat &leg_feedback);
@@ -48,6 +51,11 @@ class Tachikoma : public BaseRobot {
     /** Reset the robot's default values
      */
     void reset(void);
+
+    /** Set the calibration parameters for the robot
+     *  @param cp the calibration parameters
+     */
+    void set_calibration_params(nlohmann::json cp);
 
     /** Solve the xyz coordinate of the leg using forward kinematics
      *  @param waist, thigh, knee
@@ -69,15 +77,28 @@ class Tachikoma : public BaseRobot {
      */
     arma::vec leg_ik_solve(const arma::vec &pos, const arma::vec &enc, int legid);
 
+    /** Calibration stuff **/
+
+    /** Detect if a robot has been calibrated
+     *  @return true if calibration parameters are found, false otherwise
+     */
+    bool calibrated(void);
+
     // updated on send
     arma::mat leg_write;
     // updated on recv
     arma::mat leg_read;
+    arma::mat leg_fback;
     // updated on forward kinematics
     arma::mat leg_positions;
+    // parameters
+    arma::mat leg_min;
+    arma::mat leg_max;
+    arma::umat leg_rev;
 
   private:
-    char thigh_signature;
+    bool calibration_loaded;
+    char instruction_activate;
 };
 
 #endif

@@ -42,7 +42,7 @@ int serial_connect(serial_t *connection, char *port, int baudrate) {
     struct dirent *ent;
     char hasPossibleSerial;
     if (!(dp = opendir(INPUT_DIR))) {
-      fprintf(stderr, "Cannot find directory %s to open serial connection\n", INPUT_DIR);
+      fprintf(stderr, "[SERIAL] Cannot find directory %s to open serial connection\n", INPUT_DIR);
       return -1;
     }
     while ((ent = readdir(dp))) {
@@ -67,7 +67,7 @@ int serial_connect(serial_t *connection, char *port, int baudrate) {
       }
     }
     if (!hasPossibleSerial) {
-      fprintf(stderr, "Cannot find a serial device to open\n");
+      fprintf(stderr, "[SERIAL] Cannot find a serial device to open\n");
       return -1;
     }
   }
@@ -85,12 +85,12 @@ int serial_connect(serial_t *connection, char *port, int baudrate) {
   memset(connection->readbuf, 0, SWREADMAX);
   connection->readAvailable = 0;
 
-  printf("Connected to %s\n", connection->port);
+  printf("[SERIAL] Connected to %s\n", connection->port);
 
   return 0;
 
 error:
-  fprintf(stderr, "Cannot connect to the device on %s\n", connection->port);
+  fprintf(stderr, "[SERIAL] Cannot connect to the device on %s\n", connection->port);
   connection->connected = 0;
   if (connection->fd != -1) {
     close(connection->fd);

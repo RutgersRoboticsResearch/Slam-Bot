@@ -8,7 +8,9 @@
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motors[4];
 static int v;
-static char instr_activate;
+static int instr_activate;
+static bool leg_theta_act;
+static bool leg_vel_act;
 
 const int bufsize = 256;
 const int safesize = bufsize / 2;
@@ -36,14 +38,14 @@ void setmotors(int v) {
   motors[2]->setSpeed(v);
   motors[3]->setSpeed(v);
   if (isneg) {
-    motors[0]->run(BACKWARD);
+    motors[0]->run(FORWARD);
     motors[1]->run(FORWARD);
-    motors[2]->run(FORWARD);
+    motors[2]->run(BACKWARD);
     motors[3]->run(BACKWARD);
   } else {
-    motors[0]->run(FORWARD);
+    motors[0]->run(BACKWARD);
     motors[1]->run(BACKWARD);
-    motors[2]->run(BACKWARD);
+    motors[2]->run(FORWARD);
     motors[3]->run(FORWARD);
   }
 }
@@ -67,7 +69,7 @@ void setup() {
 
 static int targetv;
 static int prevv;
-static double targetp;
+static int targetp;
 
 void loop() {
   int nbytes = 0;
@@ -89,30 +91,35 @@ void loop() {
       e[0] = '\0';
       if ((s = strrchr(buf, '['))) {
         // CUSTOMIZE
-        sscanf(s, "[%c %lf %d]\n",
+        sscanf(s, "[%d %d %d]\n",
           &instr_activate,
           &targetp,
           &targetv);
+        leg_theta_act = instr_activate & 0x01;
+        leg_vel_act = (instr_activate & 0x02) >> 1;
       }
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
     }
   }
-  int deltav = targetv - prevv;
-  int sign = deltav >= 0 ? 1 : -1;
-  deltav *= sign;
-  if (deltav > 4) {
-    deltav = 4;
+
+  //// EXPERIMENTAL ////
+  if (leg_vel_act) {
+    // do nothing, this will override all the later statements
+  } else if (leg_theta_act) {
+    targetv = (targetp - analogRead(A0)) * 2;
   }
-  v = prevv + (deltav * sign);
-  v = limit(v, -255, 255);
+  //// EXPERIMENTAL ////
+
+  int deltav = limit(targetv - prevv, -4, 4);
+  v = limit(prevv + deltav, -255, 255);
   setmotors(v);
   prevv = v;
 
   if (millis() - msecs > 100) {
-    sprintf(wbuf, "[%d %d %lf]\n",
+    sprintf(wbuf, "[%d %d %d]\n",
       DEV_ID,
-      v,
-      (double)analogRead(A0));
+      analogRead(A0),
+      v);
     Serial.print(wbuf);
     msecs = millis();
   }

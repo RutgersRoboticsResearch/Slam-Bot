@@ -9,7 +9,7 @@ SUBOBJS = $(SERIAL)/serial.o
 OBJECTS = slambot.o xboxctrl.o
 TEST = test.o test
 
-all: subdirs $(OBJECTS) test
+all: subdirs $(OBJECTS)
 
 subdirs:
 	make -C $(BASEROBOT) baserobot.o

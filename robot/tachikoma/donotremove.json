@@ -1,0 +1,70 @@
+{
+  "dl": {
+    "knee": {
+      "max":799,
+      "min":86,
+      "reversed":false
+    },
+    "thigh": {
+      "max":752,
+      "min":152,
+      "reversed":false
+    },
+    "waist": {
+      "max":793,
+      "min":306,
+      "reversed":false
+    }
+  },
+  "dr": {
+    "knee": {
+      "max":779,
+      "min":122,
+      "reversed":false
+    },
+    "thigh": {
+      "max":755,
+      "min":187,
+      "reversed":false
+    },
+    "waist": {
+      "max":847,
+      "min":297,
+      "reversed":false
+    }
+  },
+  "ul": {
+    "knee": {
+      "max":784,
+      "min":113,
+      "reversed":false
+    },
+    "thigh": {
+      "max":771,
+      "min":198,
+      "reversed":false
+    },
+    "waist": {
+      "max":850,
+      "min":280,
+      "reversed":false
+    }
+  },
+  "ur": {
+    "knee": {
+      "max":786,
+      "min":96,
+      "reversed":false
+    },
+    "thigh": {
+      "max":777,
+      "min":184,
+      "reversed":false
+    },
+    "waist": {
+      "max":803,
+      "min":242,
+      "reversed":false
+    }
+  }
+}

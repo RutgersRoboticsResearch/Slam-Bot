@@ -1,6 +1,6 @@
 CC = g++
 CFLAGS = -pedantic -Wall -fPIC --std=c++11 -O3
-LIBS = -larmadillo
+LIBS = -larmadillo -lSDL
 SERIAL = $(shell pwd)/../serial
 BASEROBOT = $(shell pwd)/..
 INCLUDE = -I$(SERIAL) -I$(BASEROBOT)
@@ -23,7 +23,13 @@ test.o: test.cpp
 xboxctrl.o: xboxctrl.c
 	$(CC) $(CFLAGS) $(INCLUDE) -o $@ -c $<
 
-test: $(BASEROBOT)/baserobot.o $(OBJECTS) $(SUBOBJS) xboxctrl.o test.o
+test: $(BASEROBOT)/baserobot.o $(OBJECTS) $(SERIAL)/serial.o test.o
+	$(CC) $(CFLAGS) $(INCLUDE) -o $@ $^ $(LIBS)
+
+calibrate.o: calibrate.cpp
+	$(CC) $(CFLAGS) $(INCLUDE) -o $@ -c $<
+
+calibrate: $(BASEROBOT)/baserobot.o $(OBJECTS) $(SERIAL)/serial.o calibrate.o
 	$(CC) $(CFLAGS) $(INCLUDE) -o $@ $^ $(LIBS)
 
 clean:

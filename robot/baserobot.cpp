@@ -6,7 +6,7 @@
 #include "baserobot.h"
 
 #define DEV_BAUD  B57600
-#define SYNC_NSEC 100000000
+#define SYNC_NSEC 200000000
 
 using namespace arma;
 
@@ -74,6 +74,7 @@ bool BaseRobot::connect(void) {
     }
   }
   // read a message from each device
+  printf("[BASEROBOT] Sync 1: garbage...\n");
   nanosleep(&synctime, NULL);
   char *msg;
   for (serial_t *connection : this->connections) {
@@ -82,6 +83,7 @@ bool BaseRobot::connect(void) {
     } while (!msg || strlen(msg) == 0);
   }
   // read another one in case that one was garbage
+  printf("[BASEROBOT] Sync 2: actual...\n");
   nanosleep(&synctime, NULL);
   for (size_t i = 0; i < this->connections.size(); i++) {
     serial_t *connection = this->connections[i];
@@ -105,6 +107,7 @@ bool BaseRobot::connect(void) {
     this->disconnect();
     return false;
   } else {
+    printf("[BASEROBOT] Finished connecting.\n");
     return true;
   }
 }

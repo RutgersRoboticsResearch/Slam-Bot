@@ -11,7 +11,7 @@ static int v;
 
 class QuadEncoder {
   public:
-    long pos;
+    long long pos;
     bool reversed; // set
     char pin[2];
     QuadEncoder() {
@@ -65,7 +65,7 @@ class QuadEncoder {
       pin_state[1] = new_state[1];
     }
     char pin_state[2];
-    long velocity;  // estimated
+    long long velocity;  // estimated
 } enc;
 
 const int bufsize = 256;
@@ -94,13 +94,13 @@ void setmotors(int v) {
   motors[2]->setSpeed(v);
   motors[3]->setSpeed(v);
   if (isneg) {
-    motors[0]->run(BACKWARD);
-    motors[1]->run(FORWARD);
+    motors[0]->run(FORWARD);
+    motors[1]->run(BACKWARD);
     motors[2]->run(BACKWARD);
     motors[3]->run(FORWARD);
   } else {
-    motors[0]->run(FORWARD);
-    motors[1]->run(BACKWARD);
+    motors[0]->run(BACKWARD);
+    motors[1]->run(FORWARD);
     motors[2]->run(FORWARD);
     motors[3]->run(BACKWARD);
   }
@@ -153,14 +153,8 @@ void loop() {
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
     }
   }
-  int deltav = targetv - prevv;
-  int sign = deltav >= 0 ? 1 : -1;
-  deltav *= sign;
-  if (deltav > 4) {
-    deltav = 4;
-  }
-  v = prevv + (deltav * sign);
-  v = limit(v, -255, 255);
+  int deltav = limit(targetv - prevv, -4, 4);
+  v = limit(prevv + deltav, -255, 255);
   setmotors(v);
   prevv = v;
   enc.read();
@@ -168,8 +162,8 @@ void loop() {
   if (millis() - msecs > 100) {
     sprintf(wbuf, "[%d %d %d]\n",
       DEV_ID,
-      v,
-      enc.read());
+      enc.read(),
+      v);
     Serial.print(wbuf);
     msecs = millis();
   }

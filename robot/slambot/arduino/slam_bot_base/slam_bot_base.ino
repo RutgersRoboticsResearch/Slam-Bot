@@ -28,26 +28,22 @@ int limit(int x, int a, int b) {
 }
 
 void setmotors(int topleft, int topright, int botleft, int botright) {
-  bool isneg[4] = { topright < 0, botright < 0, topleft >= 0,  botleft >= 0 };
-  topright = limit(abs(topright), 0, 255);
+  bool isneg[4] = { botright >= 0, topright < 0, topleft < 0, botleft >= 0 };
   topleft = limit(abs(topleft), 0, 255);
+  topright = limit(abs(topright), 0, 255);
   botleft = limit(abs(botleft), 0, 255);
   botright = limit(abs(botright), 0, 255);
-  motors[0]->setSpeed(topright);
-  motors[1]->setSpeed(botright);
+  motors[0]->setSpeed(botright);
+  motors[1]->setSpeed(topright);
   motors[2]->setSpeed(topleft);
   motors[3]->setSpeed(botleft);
-
-  
-  
   for (int i = 0; i < 4; i++) {
     if (isneg[i]) {
       motors[i]->run(FORWARD);
     } else {
       motors[i]->run(BACKWARD);
     }
-  }  
-
+  }
 }
 
 void setup() {
@@ -104,7 +100,7 @@ void loop() {
   for (int i = 0; i < 4; i++) {
     prevv[i] = rampmotor(prevv[i], targetv[i]);
   }
-  setmotors(-prevv[0], -prevv[1], prevv[2], prevv[3]);
+  setmotors(prevv[0], prevv[1], prevv[2], prevv[3]);
 
   if (millis() - msecs > 100) {
     sprintf(wbuf, "[%d %d %d %d %d]\n",

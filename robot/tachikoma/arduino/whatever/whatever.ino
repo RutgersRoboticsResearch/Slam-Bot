@@ -3,14 +3,11 @@
 #include "utility/Adafruit_PWMServoDriver.h"
 #include <string.h>
 
-#define DEV_ID 8
+#define DEV_ID 1
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motors[4];
 static int v;
-static int instr_activate;
-static bool leg_theta_act;
-static bool leg_vel_act;
 
 const int bufsize = 256;
 const int safesize = bufsize / 2;
@@ -30,23 +27,23 @@ int limit(int x, int a, int b) {
   }
 }
 
-void setmotors(int v) {
-  bool isneg = v < 0;
-  v = limit(abs(v), 0, 128);
-  motors[0]->setSpeed(v);
-  motors[1]->setSpeed(v);
-  motors[2]->setSpeed(v);
-  motors[3]->setSpeed(v);
-  if (isneg) {
-    motors[0]->run(FORWARD);
-    motors[1]->run(FORWARD);
-    motors[2]->run(BACKWARD);
-    motors[3]->run(BACKWARD);
-  } else {
-    motors[0]->run(BACKWARD);
-    motors[1]->run(BACKWARD);
-    motors[2]->run(FORWARD);
-    motors[3]->run(FORWARD);
+void setmotors(int topleft, int topright, int botleft, int botright) {
+  bool isneg[4] = { topright < 0, topleft < 0, botleft < 0, botright < 0 };
+  topright = limit(abs(topright), 0, 255);
+  topleft = limit(abs(topleft), 0, 255);
+  botleft = limit(abs(botleft), 0, 255);
+  botright = limit(abs(botright), 0, 255);
+  motors[0]->setSpeed(topright);
+  motors[1]->setSpeed(topleft);
+  motors[2]->setSpeed(botleft);
+  motors[3]->setSpeed(botright);
+
+  for (int i = 0; i < 4; i++) {
+    if (isneg[i]) {
+      motors[i]->run(FORWARD);
+    } else {
+      motors[i]->run(BACKWARD);
+    }
   }
 }
 
@@ -56,20 +53,24 @@ void setup() {
   motors[2] = AFMS.getMotor(3);
   motors[3] = AFMS.getMotor(4);
 
-  pinMode(A0, INPUT);
-
   pinMode(13, OUTPUT); // set status LED to OUTPUT and HIGH
   digitalWrite(13, HIGH);
 
   AFMS.begin();
-  setmotors(0);
+  setmotors(0, 0, 0, 0);
   Serial.begin(57600);
   msecs = millis();
 }
 
-static int targetv;
-static int prevv;
-static int targetp;
+static int targetv[4];
+static int prevv[4];
+
+int rampmotor(int curr, int target) {
+  int delta = target - curr;
+  delta = limit(delta, -4, 4);
+  curr = limit(curr + delta, -255, 255);
+  return curr;
+}
 
 void loop() {
   int nbytes = 0;
@@ -91,35 +92,24 @@ void loop() {
       e[0] = '\0';
       if ((s = strrchr(buf, '['))) {
         // CUSTOMIZE
-        sscanf(s, "[%d %d %d]\n",
-          &instr_activate,
-          &targetp,
-          &targetv);
-        leg_theta_act = instr_activate & 0x01;
-        leg_vel_act = (instr_activate & 0x02) >> 1;
+        sscanf(s, "[%d %d %d %d]\n",
+            &targetv[0], &targetv[1], &targetv[2], &targetv[3]);
       }
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
     }
   }
-
-  //// EXPERIMENTAL ////
-  if (leg_vel_act) {
-    // do nothing, this will override all the later statements
-  } else if (leg_theta_act) {
-    targetv = (targetp - analogRead(A0)) * 2;
+  for (int i = 0; i < 4; i++) {
+    prevv[i] = rampmotor(prevv[i], targetv[i]);
   }
-  //// EXPERIMENTAL ////
-
-  int deltav = limit(targetv - prevv, -4, 4);
-  v = limit(prevv + deltav, -255, 255);
-  setmotors(v);
-  prevv = v;
+  setmotors(-prevv[0], -prevv[1], prevv[2], prevv[3]);
 
   if (millis() - msecs > 100) {
-    sprintf(wbuf, "[%d %d %d]\n",
-      DEV_ID,
-      analogRead(A0),
-      v);
+    sprintf(wbuf, "[%d %d %d %d %d]\n",
+        DEV_ID,
+        prevv[0],
+        prevv[1],
+        prevv[2],
+        prevv[3]);
     Serial.print(wbuf);
     msecs = millis();
   }

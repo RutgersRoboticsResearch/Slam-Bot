@@ -1,0 +1,5 @@
+makefile modify for calibrate program <done>
+test and see if calibrate program works <doing>
+display the numbers of the pot values on the screen (and min and max) <not yet started>
+account for direction of pot <done>
+arduino: change code slightly to account for new timestamp on send <started>
