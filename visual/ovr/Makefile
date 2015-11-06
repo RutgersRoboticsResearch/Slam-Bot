@@ -18,7 +18,7 @@ imgproc.o: imgproc.cu
 ovr.o: ovr.cu
 	$(CXX) $(CFLAGS) -o $@ -c $<
 
-test.o: test.cpp
+test.o: test2.cpp
 	$(CXX) $(CFLAGS) -o $@ -c $<
 
 ovr: $(OBJS)

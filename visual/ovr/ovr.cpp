@@ -9,7 +9,7 @@ using namespace arma;
  * the recommended parameters are 1.0, 0.22, 0.24, 0.0
  */
 
-const double u_distortion[4] = { 1.0, 0.22, 0.24, 0}; // intrinsic parameters?
+const double u_distortion[4] = { 1.0, 0.22, 0.24, 0 }; // distortion parameters
 
 double distortionScale(const vec &offset) {
   assert(offset.n_elem == 2);
