@@ -10,7 +10,7 @@
 #include "rtsplink.h"
 
 // Look at gstscripts/start_mod.sh for shell script-based code
-const char *HOST = "192.168.0.101";
+const char *HOST = "192.168.1.114";
 const int PORT = 9001;
 static int stopsig;
 static unsigned char gst_initialized;
@@ -31,8 +31,8 @@ int start_streaming(rtsplink_t *vidout, const char *host, const int port) {
 
   // modify the element's properties
   g_object_set((GstElement *)vidout->src, "device", "/dev/video0", NULL);
-  g_object_set((GstElement *)vidout->enc, "tune", "zerolatency", NULL);
-  g_object_set((GstElement *)vidout->enc, "pass", "qual", NULL);
+  gst_util_set_object_arg(G_OBJECT((GstElement *)vidout->enc), "tune", "zerolatency");
+  gst_util_set_object_arg(G_OBJECT((GstElement *)vidout->enc), "pass", "quant");
   g_object_set((GstElement *)vidout->enc, "quantizer", 20, NULL);
   g_object_set((GstElement *)vidout->sink, "host", host, NULL);
   g_object_set((GstElement *)vidout->sink, "port", port, NULL);
@@ -117,7 +117,6 @@ void stopprog(int v) {
 
 int main(int argc, char *argv[]) {
   rtsplink_t vidout;
-  signal(SIGINT, stopprog);
   int ret = start_streaming(&vidout, HOST, PORT);
   if (ret == -1) {
     printf("stopping due to error\n");

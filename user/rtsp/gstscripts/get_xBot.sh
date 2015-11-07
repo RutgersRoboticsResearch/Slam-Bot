@@ -1,6 +1,6 @@
 #!/bin/bash
 
-HOST=192.168.0.101
+HOST=192.168.1.114
 PORT=9001
 
 gst-launch-1.0 -vvv tcpclientsrc port=${PORT} host=${HOST} ! \
