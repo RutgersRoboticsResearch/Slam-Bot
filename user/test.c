@@ -2,26 +2,26 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#include "user.h"
+#include "xboxctrl.h"
 
 static int stopsig;
 
 void stop(int signo) {
+  printf("yo\n");
   stopsig = 1;
 }
 
 int main() {
-  pose3d_t base;
-  pose3d_t arm;
-  user_connect(USER_SRVR);
-  user_enable();
+  signal(SIGINT, stop);
+  xboxctrl_t ctrl;
+  xboxctrl_connect(&ctrl);
+  serial_t connection;
 
-  while (!stopsig) {
-    user_get_poses(&base, &arm);
-    printf("forward: %f, turn: %f, arm: %f, claw: %f\n",
-        base.y, base.yaw, arm.pitch, arm.yaw);
+  while (stopsig == 0) {
+    xboxctrl_update(&ctrl);
+    printf("%lf %lf %lf %lf\n", ctrl.LJOY.x, ctrl.LJOY.y, ctrl.RJOY.x, ctrl.RJOY.y);
   }
 
-  user_disconnect();
+  xboxctrl_disconnect(&ctrl);
   return 0;
 }

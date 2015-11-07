@@ -6,8 +6,7 @@
 using namespace arma;
 using namespace std;
 
-/** Convolution operations
- */
+/** Convolution operations **/
 
 static mat flipmat(const mat &F) {
   mat G(F.n_rows, F.n_cols);
@@ -69,7 +68,7 @@ mat conv2(const mat &F, const mat &H) {
   return G;
 }
 
-cube conv2rgb(const cube &F, const mat &H) {
+cube conv2(const cube &F, const mat &H) {
   cube G(F.n_rows, F.n_cols, F.n_slices);
   for (uword i = 0; i < F.n_slices; i++) {
     G.slice(i) = conv2(F.slice(i), H);
@@ -110,6 +109,8 @@ mat laplace_gauss2(uword n, double sigma2) {
   return H;
 }
 
+/** FEATURE DETECTION **/
+
 // try to get adaptive thresholding working
 mat edge2(const mat &F, uword n, double sigma2, bool isSobel, bool isDoG) {
   if (isSobel) {
@@ -132,36 +133,28 @@ mat edge2(const mat &F, uword n, double sigma2, bool isSobel, bool isDoG) {
   }
 }
 
-mat edge2rgb(const cube &F, uword n, double sigma2) {
-  return edge2(cvt_rgb2gray(F), n, sigma2);
+mat edge2(const cube &F, uword n, double sigma2, bool isSobel, bool isDoG) {
+  return edge2(cvt_rgb2gray(F), n, sigma2, isSobel, isDoG);
 }
 
-vector<mat> gradient2(const mat &F) {
-  mat sobel = reshape(mat({
-    -1.0, 0.0, 1.0,
-    -2.0, 0.0, 2.0,
-    -1.0, 0.0, 1.0 }), 3, 3).t();
+void gradient2(mat &DX, mat &DY, const mat &F) {
+  mat sobel = {
+    { -1.0, 0.0, 1.0 },
+    { -2.0, 0.0, 2.0 },
+    { -1.0, 0.0, 1.0 } };
   sobel /= accu(abs(sobel));
-  mat sobel_x = sobel;
-  mat sobel_y = sobel.t();
-  vector<mat> g;
-  g.push_back(conv2(F, sobel_x));
-  g.push_back(conv2(F, sobel_y));
-  return g;
+  DX = conv2(F, sobel);
+  DY = conv2(F, sobel.t());
 }
 
-vector<cube> gradient2rgb(const cube &F) {
-  mat sobel = reshape(mat({
-    -1.0, 0.0, 1.0,
-    -2.0, 0.0, 2.0,
-    -1.0, 0.0, 1.0 }), 3, 3).t();
+void gradient2(mat &DX, mat &DY, const cube &F) {
+  mat sobel = {
+    { -1.0, 0.0, 1.0 },
+    { -2.0, 0.0, 2.0 },
+    { -1.0, 0.0, 1.0 } };
   sobel /= accu(abs(sobel));
-  mat sobel_x = sobel;
-  mat sobel_y = sobel.t();
-  vector<cube> g;
-  g.push_back(conv2rgb(F, sobel_x));
-  g.push_back(conv2rgb(F, sobel_y));
-  return g;
+  DX = conv2(F, sobel);
+  DY = conv2(F, sobel.t());
 }
 
 mat nmm2(const mat &F, uword nsize, bool min_en, bool max_en) {
@@ -279,7 +272,7 @@ mat hist_segment2(const mat &F, uword k) { // do mixture of gaussians later on?
   return H;
 }
 
-cube hist_segment2rgb(const cube &F, uword k) {
+cube hist_segment2(const cube &F, uword k) {
   cube C = F;
   mat Z(C.n_slices, C.n_rows * C.n_cols);
   for (uword i = 0; i < C.n_rows; i++) {
@@ -446,6 +439,14 @@ mat imresize2(const mat &A, uword m, uword n) {
   return G;
 }
 
+cube imresize2(const cube &C, uword m, uword n) {
+  cube F(m, n, C.n_slices);
+  for (uword k = 0; k < C.n_slices; k++) {
+    F.slice(k) = imresize2(C.slice(k), m, n);
+  }
+  return F;
+}
+
 mat fast_imresize_half(const arma::mat &A) {
   assert(A.n_rows > 1 && A.n_cols > 1);
   mat I(A.n_rows/2, A.n_cols/2);
@@ -460,41 +461,40 @@ mat fast_imresize_half(const arma::mat &A) {
   return I;
 }
 
-cube imresize2rgb(const cube &C, uword m, uword n) {
-  cube F(m, n, C.n_slices);
-  for (uword k = 0; k < C.n_slices; k++) {
-    F.slice(k) = imresize2(C.slice(k), m, n);
-  }
-  return F;
-}
-
-vector<mat> laplace_pyramid2(const mat &H, size_t levels) {
-  vector<mat> P;
-  P.push_back(H);
-  mat S = H;
-  while ((levels == 0 || P.size() < levels) && S.n_rows > 1 && S.n_cols > 1) {
-    S = fast_imresize_half(S);
-    P.push_back(S);
-  }
-  return P;
-}
-
-mat laplace_restore(const vector<mat> &P) {
-  return P[0];
-}
-
-mat sift(const mat &H) {
-  // step one: create the laplacian pyramid of multiple scalings
-  vector<mat> P = laplace_pyramid2(H);
-  mat G[7][10]; // create 10 different gaussian scalings, restrict pyramid resize to 7
-  for (int s = 0; s < 10; s++) {
-    G[0][s] = P[s];
-  }
-  for (int n = 0; n < 7; n++) {
-    for (int s = 1; s < 10; s++) {
-      G[n][s] = (conv2(P[s], gauss2((uword)((1<<(9-n))+1), (double)(s+1)/2.0)));
+vector< vector<mat> > gausspyr2(const mat &I, int noctaves, int nscales, double sigma2) {
+  vector< vector<mat> > pyramid;
+  uword kernel_size = noctaves * (int)(sigma2 * 2) + 1;
+  for (int o = 0; o < noctaves; o++) {
+    vector<mat> octave;
+    for (int s = 0; s < nscales; s++) {
+      double var = sigma2 * s;
+      mat B;
+      if (i == 0) {
+        B = I;
+      } else {
+        B = pyramid[l - 1][i];
+        B = imresize2(B, B.n_rows / 2, B.n_cols / 2);
+      }
+      octave.push_back(conv2(B, gauss2(kernel_size, var)));
     }
+    pyramid.push_back(octave);
   }
-  // step two: create a gradient scale between all laplacian pyramid sizes
-  return H;
+  return pyramid;
+}
+
+void lappyr2(vector< vector<mat> > &blurred, vector< vector<mat> > &edges,
+             const mat &I, int noctaves, int nscales, double sigma2) {
+  // grab a gaussian pyramid
+  blurred = gausspyr2(I, noctaves, nscales, sigma2);
+  // create edges from blurred images
+  edges = vector< vector<mat> >();
+  for (int o = 0; o < noctaves; o++) {
+    vector<mat> octave;
+    for (int s = 0; s < nscales - 1; s++) {
+      int s1 = s;
+      int s2 = s + 1;
+      octave.push_back(blurred[o][s2] - blurred[o][s1]);
+    }
+    edges.push_back(octave);
+  }
 }

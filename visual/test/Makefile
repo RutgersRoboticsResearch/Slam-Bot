@@ -1,7 +1,7 @@
-CC = nvcc
-CFLAGS = `pkg-config --cflags opencv`
+CC = g++
+CFLAGS = `pkg-config --cflags opencv` -std=c++11
 LIBS = `pkg-config --libs opencv`
-OBJS = gcube.o imgfmt.o imgproc.o test.o
+OBJS = highgui.o test.o
 TEST = test
 
 all: $(OBJS) $(TEST)
@@ -9,17 +9,17 @@ all: $(OBJS) $(TEST)
 test: $(OBJS)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 
-imgproc.o: imgproc.cu
-	$(CC) -o $@ -c $<
+imgproc.o: imgproc.cpp
+	$(CC) $(CFLAGS) -o $@ -c $<
 
-imgfmt.o: imgfmt.cu
-	$(CC) -o $@ -c $<
+highgui.o: highgui.cpp
+	$(CC) $(CFLAGS) -o $@ -c $<
 
-gcube.o: gcube.cu
-	$(CC) -o $@ -c $<
+gcube.o: gcube.cpp
+	$(CC) $(CFLAGS) -o $@ -c $<
 
 test.o: test.cpp
-	$(CC) -o $@ -c $<
+	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
 	rm -f $(OBJS) $(TEST)

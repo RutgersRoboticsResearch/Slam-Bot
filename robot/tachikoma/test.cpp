@@ -33,6 +33,7 @@ int main() {
   // connect to the tachikoma
   screen = SDL_SetVideoMode(640, 480, 32, SDL_SWSURFACE);
   Tachikoma tachikoma;
+  tachikoma.connect();
   
   if (!tachikoma.connected()) {
     printf("[TACHI TEST] Not connected to anything, disconnecting...\n");
@@ -128,11 +129,11 @@ int main() {
         leg_pos(i, KNEE) = (key_pressed[KEYID('i')] - key_pressed[KEYID('j')]) * M_PI_4 / 2;
       }
     }
-    tachikoma.send(leg_pos, leg_vel, wheels, zeros<mat>(1, 1), position_en, velocity_en);
+    tachikoma.move(leg_pos, leg_vel, wheels, zeros<mat>(1, 1), position_en, velocity_en);
     // print out the feedback from the robot
     mat leg_sensors;
     mat leg_feedback;
-    tachikoma.recv(leg_sensors, leg_feedback);
+    tachikoma.sense(leg_sensors, leg_feedback);
     std::cout << leg_sensors << std::endl;
     std::cout << leg_feedback << std::endl;
 

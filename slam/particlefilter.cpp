@@ -7,10 +7,11 @@
 
 using namespace arma;
 
-const double var_radius = 0.0;
-const double var_angle = 0.0;
 static double UniformPDF ( void );
 static mat gauss2( int window_size, double sigma );
+static double intpow(double x, double n);
+static double erfinv(double p);
+static double 
 
 static double UniformPDF ( void )
 { 
@@ -38,7 +39,7 @@ static double erfinv(double p) {
     0.223209757419
   };
   vec x(a.n_elems);
-  p *= sqrt(M_PI) / 2.0;
+  p *= 1.0 / sqrt(M_PI);
   for (int i = 0; i < x.n_elems; i++) {
     x(i) = intpow(p, 2 * i + 1);
   }
@@ -49,7 +50,7 @@ static double limitf(int v, int x1, int x2) {
   return (v > x2) ? x2 : ((v < x1) ? x1 : v);
 }
 
-static double InverseGaussCDF( double p, double sigma) {
+static double inv_gauss(double p, double sigma) {
   return limitf(erfinv(p * 2.0 - 1.0) / 2.0, -1.0, 1.0) * sigma;
 }
 
@@ -76,18 +77,18 @@ ParticleFilter::ParticleFilter(GridMap &map, vec hyp_location, int nparticles) :
   struct timeval t;
   gettimeofday( &t, NULL );
   srand( ( unsigned int )( t.tv_sec * 1000000 + t.tv_usec ) +
-      ( unsigned int ) getpid());
+         ( unsigned int ) getpid());
 
   // create a new vector of particles 
   for ( int i = 0; i < nparticles; i++ ) {
     // use the inverse CDF of the gauss function to select the x and y with a gauss relationship
-    double spread = 20.0;
+    double sigma = 20.0; // this is the error of the a-priori distribution (initial position)
     this->particles.push_back(
-        Particle( ( InverseGaussCDF(UniformPDF(), spread) + hyp_location(0) )
-          ,         ( InverseGaussCDF(UniformPDF(), spread) + hyp_location(1) )
-          ,         ( UniformPDF() * 2.0 * M_PI )
-          ,         1.0
-          ) );
+        Particle( inv_gauss(UniformPDF(), sigma) + hyp_location(0)
+            ,     inv_gauss(UniformPDF(), sigma) + hyp_location(1)
+            ,     UniformPDF() * 2.0 * M_PI
+            ,     1.0
+          );
   }
 }
 

@@ -21,8 +21,8 @@ libuser.a: $(OBJECTS)
 test.o: test.c
 	$(CC) -o $@ -c $< $(INCLUDE)
 
-test: $(OBJECTS) test.o
-	$(CC) $(CFLAGS) -o $@ $^ $(INCLUDE)
+test: xboxctrl.o test.o
+	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
 	rm -f $(OBJECTS) $(TARGET) $(TEST)
