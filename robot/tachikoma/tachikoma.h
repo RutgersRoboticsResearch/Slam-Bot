@@ -3,7 +3,10 @@
 
 #include <armadillo>
 #include <string>
+#include <thread>
+#include <mutex>
 #include <njson/json.hpp>
+#include <sys/time.h>
 #include "baserobot.h"
 
 class Tachikoma : public BaseRobot {
@@ -16,6 +19,11 @@ class Tachikoma : public BaseRobot {
      */
     ~Tachikoma(void);
 
+    /** Try to connect to the robot and start a thread for the device update
+     *  @return true if successful, false otherwise
+     */
+    bool connect(void);
+
     /** Detect if the tachikoma is connected to all ports or not
      *  @return true if all ports are connected, false otherwise
      */
@@ -25,6 +33,10 @@ class Tachikoma : public BaseRobot {
      *  @return the number of ports that are connected
      */
     int numconnected(void);
+
+    /** Disconnect from all devices
+     */
+    void disconnect(void);
 
     /** Send vectors of values to the microcontrollers
      *  @param leg_theta a 3x4 matrix representing the motion positions
@@ -77,12 +89,20 @@ class Tachikoma : public BaseRobot {
      */
     arma::vec leg_ik_solve(const arma::vec &pos, const arma::vec &enc, int legid);
 
-    /** Calibration stuff **/
-
     /** Detect if a robot has been calibrated
      *  @return true if calibration parameters are found, false otherwise
      */
     bool calibrated(void);
+
+    /** threaded versions of send and recv
+     */
+    void move(const arma::mat &leg_theta,
+              const arma::mat &leg_vel,
+              const arma::vec &wheels,
+              const arma::mat &arm_theta,
+              bool leg_theta_act = false,
+              bool leg_vel_act = true);
+    void sense(arma::mat &leg_sensors, arma::mat &leg_feedback);
 
     // updated on send
     arma::mat leg_write;
@@ -96,7 +116,26 @@ class Tachikoma : public BaseRobot {
     arma::mat leg_max;
     arma::umat leg_rev;
 
+    // used for the device update
+    bool manager_running;
+    void update_send(void);
+    void update_recv(void);
+
   private:
+    // update manager
+    std::thread *device_manager;
+    std::mutex *read_lock;
+    std::mutex *write_lock;
+    arma::mat buffered_leg_theta;
+    arma::mat buffered_leg_vel;
+    arma::mat buffered_wheels;
+    arma::mat buffered_arm_theta;
+    bool buffered_leg_theta_act;
+    bool buffered_leg_vel_act;
+    arma::mat buffered_leg_sensors;
+    arma::mat buffered_leg_feedback;
+    struct timeval prevwritetime;
+
     bool calibration_loaded;
     char instruction_activate;
 };

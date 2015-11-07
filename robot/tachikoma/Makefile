@@ -1,6 +1,6 @@
 CC = g++
 CFLAGS = -pedantic -Wall -fPIC --std=c++11 -O3
-LIBS = -larmadillo -lSDL
+LIBS = -larmadillo -lSDL -pthread
 SERIAL = $(shell pwd)/../serial
 BASEROBOT = $(shell pwd)/..
 INCLUDE = -I$(SERIAL) -I$(BASEROBOT)

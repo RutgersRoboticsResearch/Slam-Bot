@@ -38,7 +38,8 @@ int tts_select_voice(const char *voicename) {
  */
 int tts_say(const char *msg) {
   if (!voice_selected) {
-    tts_select_voice("voice_cmu_us_slt_arctic_hts");
+//    tts_select_voice("voice_cmu_us_slt_arctic_hts");
+    tts_select_voice("voice_kal_diphone");
   }
   festival_say_text(msg);
   festival_wait_for_spooler();
