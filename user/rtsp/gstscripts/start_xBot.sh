@@ -1,6 +1,6 @@
 #!/bin/bash
 
-HOST=192.168.1.114
+HOST=192.168.43.57
 PORT=9001
 
 gst-launch-1.0 -vvv v4l2src device=/dev/video0 ! \
