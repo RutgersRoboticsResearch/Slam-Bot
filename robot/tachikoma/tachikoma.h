@@ -65,8 +65,10 @@ class Tachikoma : public BaseRobot {
     void reset(void);
 
     /** Set the calibration parameters for the robot
+     *  @param filename a name of a file
      *  @param cp the calibration parameters
      */
+    bool set_calibration_params(const std::string &filename);
     void set_calibration_params(nlohmann::json cp);
 
     /** Solve the xyz coordinate of the leg using forward kinematics

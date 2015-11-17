@@ -3,7 +3,10 @@
 mat sift(const mat &H) {
   imgpyr2 blurred;
   imgpyr2 edges;
-  lappyr2(blurred, edges, H);
+  // 1) SIFT Scale-space extrema
+  int noctaves = 4, nscales = 5;
+  double sigma2 = 1.6;
+  lappyr2(blurred, edges, noctaves, nscales, sigma2);
   const int radius = 1;
   for (int i = 0; i < edges.size(); i++) {
     for (int j = 1; j < edges[i].size() - 1; j++) {
@@ -20,6 +23,7 @@ mat sift(const mat &H) {
           if (u == 0 || v == 0 || u == E1.n_rows || v = E1.n_cols) {
             E1(u, v) = 0;
           }
+          // find the extrema in the images
           for (int x = -radius; x <= radius; x++) {
             for (int y = -radius; y <= radius; y++) {
               if (E1(u, v) < E0(u + y, v + x) ||
@@ -37,8 +41,13 @@ mat sift(const mat &H) {
           E1(u, v) = max_ext || min_ext;
         }
       }
-      // next step!
-    
+      // once we have the image pyramids, then we can
+      // try to find the magnitude of the keypoint descriptor
     }
   }
+  // 2) Accurate Keypoint Localization
+  // use the Taylor method (later on)
+  // for now just return everything
+  
+  // 3) Orientation Assignment
 }

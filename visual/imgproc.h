@@ -118,7 +118,7 @@ typedef std::vector< std::vector<arma::mat> > imgpyr2;
  *  @param levels (optional) number of levels in the pyramid, default 0 for infinite
  */
 void lappyr2(imgpyr2 &blurred, imgpyr2 &edges, const arma::mat &I,
-    int iter = 8, int levels = 4, double sigma2 = 0.5);
+    int noctaves = 8, int nscales = 4, double sigma2 = 0.5);
 
 #else
 
