@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+// TODO: allow compatibility with arma commands
+
 namespace gfill {
   const uint8_t none = 0;
   const uint8_t zeros = 1;
@@ -49,8 +51,6 @@ class gcube {
     size_t n_slices;
     size_t n_elem;
 };
-
-
 
 #endif
 #endif

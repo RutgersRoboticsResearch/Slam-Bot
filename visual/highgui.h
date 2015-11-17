@@ -112,14 +112,32 @@ arma::cube cvt_gray2rgb(const arma::mat &image);
 
 #include "gcube.h"
 
+/** Display a gcube on a window
+ *  @param window_name the name of the window
+ *  @param image the gcube to display
+ */
 void disp_gcube(const std::string &window_name, gcube &image);
 
+/** Wait until presses a button on the window
+ */
 void disp_wait(void);
 
+/** Wait 30 milliseconds or until user presses a button
+ *  @return the value of the button pressed if a button was pressed,
+ *  otherwise -1
+ */
 int disp_keyPressed(void);
 
+/** Convert a gcube from RGB space to GRAY space
+ *  @param image the RGB image
+ *  @return an image in GRAY space
+ */
 gcube gpu_rgb2gray(const gcube &image);
 
+/** Convert a gcube from GRAY space to RGB space
+ *  @param image the GRAY image
+ *  @return an image in RGB space
+ */
 gcube gpu_gray2rgb(const gcube &image);
 
 #endif
