@@ -10,7 +10,6 @@
 #include <cstdio>
 #include <ctime>
 #include <signal.h>
-#include "coord.h"
 #include "robot.h"
 #include "user.h"
 #include "agent.h"
@@ -35,8 +34,6 @@ void stop_program(int signum) {
  *  @return 0 on success, -1 otherwise
  */
 int main(int argc, char *argv[]) {
-  pose3d_t base[2];
-  pose3d_t arm[2];
   int input_id;
   enum input_states { S_USER, S_AGENT };
 

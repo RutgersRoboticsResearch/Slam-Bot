@@ -80,13 +80,19 @@ int main() {
             case SDLK_k: key_pressed[KEYID('k')] = 1; break;
             case SDLK_p: key_pressed[KEYID('p')] = 1; break;
             case SDLK_l: key_pressed[KEYID('l')] = 1; break;
+            case SDLK_q: key_pressed[KEYID('q')] = 1; break;
+            case SDLK_w: key_pressed[KEYID('w')] = 1; break;
+            case SDLK_e: key_pressed[KEYID('e')] = 1; break;
+            case SDLK_a: key_pressed[KEYID('a')] = 1; break;
+            case SDLK_s: key_pressed[KEYID('s')] = 1; break;
+            case SDLK_d: key_pressed[KEYID('d')] = 1; break;
             case SDLK_1: legid = 0; break;
             case SDLK_2: legid = 1; break;
             case SDLK_3: legid = 2; break;
             case SDLK_4: legid = 3; break;
-            case SDLK_q: velocity_en = true; position_en = false; break;
-            case SDLK_w: velocity_en = false; position_en = true; break;
-            case SDLK_e: velocity_en = false; position_en = false; break;
+            case SDLK_8: velocity_en = true; position_en = false; break;
+            case SDLK_9: velocity_en = false; position_en = true; break;
+            case SDLK_0: velocity_en = false; position_en = false; break;
             default: break;
           }
         } break;
@@ -100,6 +106,12 @@ int main() {
             case SDLK_k: key_pressed[KEYID('k')] = 0; break;
             case SDLK_p: key_pressed[KEYID('p')] = 0; break;
             case SDLK_l: key_pressed[KEYID('l')] = 0; break;
+            case SDLK_q: key_pressed[KEYID('q')] = 0; break;
+            case SDLK_w: key_pressed[KEYID('w')] = 0; break;
+            case SDLK_e: key_pressed[KEYID('e')] = 0; break;
+            case SDLK_a: key_pressed[KEYID('a')] = 0; break;
+            case SDLK_s: key_pressed[KEYID('s')] = 0; break;
+            case SDLK_d: key_pressed[KEYID('d')] = 0; break;
             default: break;
           }
         } break;
@@ -114,19 +126,49 @@ int main() {
     // send over the values to the robot
     cout << "calibrated? " << tachikoma.calibrated() << endl;
     cout << "leg id? " << legid << endl;
+
+    int k_u = key_pressed[KEYID('u')];
+    int k_i = key_pressed[KEYID('i')];
+    int k_o = key_pressed[KEYID('o')];
+    int k_p = key_pressed[KEYID('p')];
+    int k_h = key_pressed[KEYID('h')];
+    int k_j = key_pressed[KEYID('j')];
+    int k_k = key_pressed[KEYID('k')];
+    int k_l = key_pressed[KEYID('l')];
+    int k_q = key_pressed[KEYID('q')];
+    int k_w = key_pressed[KEYID('w')];
+    int k_e = key_pressed[KEYID('e')];
+    int k_a = key_pressed[KEYID('a')];
+    int k_s = key_pressed[KEYID('s')];
+    int k_d = key_pressed[KEYID('d')];
+
     if (velocity_en) {
       printf("velocity en\n");
       leg_vel(legid, WAIST) = (key_pressed[KEYID('u')] - key_pressed[KEYID('h')]);
       leg_vel(legid, THIGH) = (key_pressed[KEYID('i')] - key_pressed[KEYID('j')]);
       leg_vel(legid, KNEE) = (key_pressed[KEYID('o')] - key_pressed[KEYID('k')]);
-//    wheels(legid) = (key_pressed[KEYID('p')] - key_pressed[KEYID('l')]);
+      wheels(legid) = (key_pressed[KEYID('p')] - key_pressed[KEYID('l')]);
     } else if (position_en) {
       printf("position en\n");
       double coeff[] = { -1.0, 1.0, 1.0, -1.0 };
       for (int i = 0; i < NUM_LEGS; i++) {
-        leg_pos(i, WAIST) = (key_pressed[KEYID('u')]) * (M_PI_4 * coeff[i]);
-        leg_pos(i, THIGH) = (key_pressed[KEYID('i')] - key_pressed[KEYID('j')]) * M_PI_4 / 2;
-        leg_pos(i, KNEE) = (key_pressed[KEYID('i')] - key_pressed[KEYID('j')]) * M_PI_4 / 2;
+        leg_pos(i, WAIST) = (k_u) * M_PI_4 * coeff[i];
+        leg_pos(i, THIGH) = (k_i - k_j) * M_PI_4 / 2;
+        leg_pos(i, KNEE) =  (k_i - k_j) * M_PI_4 / 2;
+        switch (i) {
+          case UL:
+            wheels(legid) = k_w - k_a - k_s + k_d - k_q + k_e;
+            break;
+          case UR:
+            wheels(legid) = k_w + k_a - k_s - k_d + k_q - k_e;
+            break;
+          case DL:
+            wheels(legid) = k_w - k_a - k_s + k_d + k_q - k_e;
+            break;
+          case DR:
+            wheels(legid) = k_w + k_a - k_s - k_d - k_q + k_e;
+            break;
+        }
       }
     }
     tachikoma.move(leg_pos, leg_vel, wheels, zeros<mat>(1, 1), position_en, velocity_en);
@@ -134,8 +176,8 @@ int main() {
     mat leg_sensors;
     mat leg_feedback;
     tachikoma.sense(leg_sensors, leg_feedback);
-    std::cout << leg_sensors << std::endl;
-    std::cout << leg_feedback << std::endl;
+    std::cout << leg_sensors.t() << std::endl;
+    std::cout << leg_feedback.t() << std::endl;
 
     // render screen
     SDL_Flip(screen);

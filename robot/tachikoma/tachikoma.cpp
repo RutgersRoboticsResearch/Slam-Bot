@@ -368,6 +368,24 @@ vec Tachikoma::recv(mat &leg_sensors, mat &leg_feedback) {
   return vectorise(this->leg_read);
 }
 
+bool Tachikoma::set_calibration_params(const string &filename) {
+  FILE *fp;
+  fp = fopen(filename.c_str(), "r");
+  if (!fp) {
+    return false;
+  }
+  int beg = ftell(fp);
+  fseek(fp, 0, SEEK_END);
+  int end = ftell(fp);
+  fseek(fp, 0, SEEK_SET);
+  char *buf = new char[end - beg + 1];
+  size_t bytesread = fread((void *)buf, sizeof(char), (size_t)(end - beg), fp);
+  buf[bytesread] = '\0';
+  this->set_calibration_params(json::parse(buf));
+  delete buf;
+  return true;
+}
+
 void Tachikoma::set_calibration_params(json cp) {
   vector<string> legnames = { "ul", "ur", "dl", "dr" };
   vector<int> legids = { UL, UR, DL, DR };

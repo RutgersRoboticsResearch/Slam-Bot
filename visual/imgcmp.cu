@@ -1,7 +1,7 @@
 #include "gpu_util.h"
 
 __global__ void GPU_sad2(float *S, float *I1, float *I2, int n_rows, int n_cols) {
-
+ 
 }
 
 float sad2(const gcube &I1, const gcube &I2) {
