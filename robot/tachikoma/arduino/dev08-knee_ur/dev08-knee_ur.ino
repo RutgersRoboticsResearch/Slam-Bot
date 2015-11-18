@@ -120,7 +120,7 @@ void loop() {
   if (leg_vel_act) {
     // do nothing, this will override all the later statements
   } else if (leg_theta_act) {
-    targetv = (targetp - analogRead(A0)) * 2;
+    targetv = (targetp - analogRead(A0)) * 3;
   }
 
   int deltav = limit(targetv - prevv, -4, 4);

@@ -3,7 +3,7 @@
 #include "utility/Adafruit_PWMServoDriver.h"
 #include <string.h>
 
-#define DEV_ID 7
+#define DEV_ID 3
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motors[4];
@@ -45,14 +45,14 @@ void setmotors(int v) {
     motors[3]->run(RELEASE);
   } else if (isneg) {
     motors[0]->run(FORWARD);
-    motors[1]->run(FORWARD);
+    motors[1]->run(BACKWARD);
     motors[2]->run(BACKWARD);
-    motors[3]->run(BACKWARD);
+    motors[3]->run(FORWARD);
   } else {
     motors[0]->run(BACKWARD);
-    motors[1]->run(BACKWARD);
+    motors[1]->run(FORWARD);
     motors[2]->run(FORWARD);
-    motors[3]->run(FORWARD);
+    motors[3]->run(BACKWARD);
   }
 }
 
@@ -120,7 +120,7 @@ void loop() {
   if (leg_vel_act) {
     // do nothing, this will override all the later statements
   } else if (leg_theta_act) {
-    targetv = (targetp - analogRead(A0)) * 2;
+    targetv = (targetp - analogRead(A0)) * 3;
   }
 
   int deltav = limit(targetv - prevv, -4, 4);

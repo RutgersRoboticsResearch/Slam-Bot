@@ -157,16 +157,16 @@ int main() {
         leg_pos(i, KNEE) =  (k_i - k_j) * M_PI_4 / 2;
         switch (i) {
           case UL:
-            wheels(legid) = k_w - k_a - k_s + k_d - k_q + k_e;
+            wheels(i) = k_w - k_a - k_s + k_d - k_q + k_e;
             break;
           case UR:
-            wheels(legid) = k_w + k_a - k_s - k_d + k_q - k_e;
+            wheels(i) = k_w + k_a - k_s - k_d + k_q - k_e;
             break;
           case DL:
-            wheels(legid) = k_w - k_a - k_s + k_d + k_q - k_e;
+            wheels(i) = k_w - k_a - k_s + k_d + k_q - k_e;
             break;
           case DR:
-            wheels(legid) = k_w + k_a - k_s - k_d - k_q + k_e;
+            wheels(i) = k_w + k_a - k_s - k_d - k_q + k_e;
             break;
         }
       }

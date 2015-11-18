@@ -105,7 +105,7 @@ bool Tachikoma::connect(void) {
 
 bool Tachikoma::connected(void) {
   // TODO: change to 14 after testing
-  return this->connections.size() > 0;
+  return this->connections.size() == 14;
 }
 
 int Tachikoma::numconnected(void) {
@@ -577,9 +577,9 @@ static double enc_transform(int jointid, double minv, double maxv, int reversed,
   } // range is only -90 to 90
   value = limitf(value, rad[0], rad[1]);
   double ratio = enc_range / (rad[1] - rad[0]);
-//  if (reversed) { // buggy, be careful!
-//    value = -value; // this only works since range is -90 to 90
-//  }
+  if (reversed) {
+    value = -value;
+  }
   return (value - rad[0]) * ratio + minv;
 }
 
