@@ -74,6 +74,7 @@ char buf[bufsize];
 char msg[bufsize];
 char wbuf[safesize];
 unsigned long msecs;
+unsigned long timeout;
 char numbuf[4];
 
 int limit(int x, int a, int b) {
@@ -93,7 +94,12 @@ void setmotors(int v) {
   motors[1]->setSpeed(v);
   motors[2]->setSpeed(v);
   motors[3]->setSpeed(v);
-  if (isneg) {
+  if (v == 0) {
+    motors[0]->run(RELEASE);
+    motors[1]->run(RELEASE);
+    motors[2]->run(RELEASE);
+    motors[3]->run(RELEASE);
+  } else if (isneg) {
     motors[0]->run(BACKWARD);
     motors[1]->run(FORWARD);
     motors[2]->run(FORWARD);
@@ -121,6 +127,7 @@ void setup() {
   setmotors(0);
   Serial.begin(57600);
   msecs = millis();
+  timeout = millis();
 }
 
 static int targetv;
@@ -148,10 +155,19 @@ void loop() {
         // CUSTOMIZE
         sscanf(s, "[%d]\n",
           &targetv);
+        timeout = millis();
       }
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
     }
   }
+
+  // EMERGENCY STOP: MASTER COMM LOST
+  if (millis() - timeout > 500) {
+    // after .5 seconds, stop the robot
+    setmotors(0);
+    prevv = 0;
+  }
+
   int deltav = limit(targetv - prevv, -4, 4);
   v = limit(prevv + deltav, -255, 255);
   setmotors(v);

@@ -18,6 +18,7 @@ char buf[bufsize];
 char msg[bufsize];
 char wbuf[safesize];
 unsigned long msecs;
+unsigned long timeout;
 char numbuf[4];
 
 int limit(int x, int a, int b) {
@@ -36,22 +37,28 @@ void setmotors(int topv, int btmv) {
   topv = limit(abs(topv), 0, 128);
   btmv = limit(abs(btmv), 0, 128);
   motors[0]->setSpeed(topv);
-  motors[1]->setSpeed(topv);
+  motors[1]->setSpeed(btmv);
   motors[2]->setSpeed(btmv);
-  motors[3]->setSpeed(btmv);
-  if (topisneg) {
+  motors[3]->setSpeed(topv);
+  if (topv == 0) {
+    motors[0]->run(RELEASE);
+    motors[3]->run(RELEASE);
+  } else if (topisneg) {
     motors[0]->run(BACKWARD);
-    motors[1]->run(FORWARD);
-  } else {
-    motors[0]->run(FORWARD);
-    motors[1]->run(BACKWARD);
-  }
-  if (btmisneg) {
-    motors[2]->run(BACKWARD);
     motors[3]->run(FORWARD);
   } else {
-    motors[2]->run(FORWARD);
+    motors[0]->run(FORWARD);
     motors[3]->run(BACKWARD);
+  }
+  if (btmv == 0) {
+    motors[2]->run(RELEASE);
+    motors[1]->run(RELEASE);
+  } else if (btmisneg) {
+    motors[2]->run(BACKWARD);
+    motors[1]->run(FORWARD);
+  } else {
+    motors[2]->run(FORWARD);
+    motors[1]->run(BACKWARD);
   }
 }
 
@@ -71,6 +78,7 @@ void setup() {
   setmotors(0, 0);
   Serial.begin(57600);
   msecs = millis();
+  timeout = millis();
 }
 
 static int targetv[2];
@@ -80,6 +88,7 @@ static int targetp[2];
 void loop() {
   int nbytes = 0;
   if ((nbytes = Serial.available())) {
+    timeout = millis();
     // read + attach null byte
     int obytes = strlen(buf);
     Serial.readBytes(&buf[obytes], nbytes);
@@ -105,19 +114,26 @@ void loop() {
           &targetv[1]);
         leg_theta_act = instr_activate & 0x01;
         leg_vel_act = (instr_activate & 0x02) >> 1;
+        timeout = millis();
       }
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
     }
   }
 
-  //// EXPERIMENTAL ////
+  // EMERGENCY STOP: MASTER COMM LOST
+  if (millis() - timeout > 500) {
+    // after .5 seconds, stop the robot
+    setmotors(0, 0);
+    prevv[0] = 0;
+    prevv[1] = 0;
+  }
+
   if (leg_vel_act) {
     // do nothing, this will override all the later statements
   } else if (leg_theta_act) {
     targetv[0] = (targetp[0] - analogRead(A0)) * 2;
     targetv[1] = (targetp[1] - analogRead(A1)) * 2;
   }
-  //// EXPERIMENTAL ////
 
   int deltav[2] = { limit(targetv[0] - prevv[0], -4, 4),
                     limit(targetv[1] - prevv[1], -4, 4) };
