@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS = -pedantic -Wall -fPIC --std=c++11 -O3
+CFLAGS = -pedantic -Wall -fPIC --std=c++11 -O3 -g
 LIBS = -larmadillo -lSDL -pthread
 SERIAL = $(shell pwd)/../serial
 BASEROBOT = $(shell pwd)/..

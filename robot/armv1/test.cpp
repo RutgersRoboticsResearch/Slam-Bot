@@ -41,14 +41,14 @@ int main() {
     return 1;
   }
 
-  string params;
+/*  string params;
   ifstream params_file("calib_params.json");
   string temp;
   while (getline(params_file, temp)) {
     params += temp;
   }
   params_file.close();
-  arm.set_calibration_params(json::parse(params));
+  arm.set_calibration_params(json::parse(params));*/
 
   mat arm_pos(1, DOF, fill::zeros);
   mat arm_vel(1, DOF, fill::zeros);
@@ -61,7 +61,6 @@ int main() {
   while (!stopsig) {
     SDL_Event event;
     start = SDL_GetTicks();
-
     // grab events
     while (SDL_PollEvent(&event)) {
       switch (event.type) {
@@ -112,7 +111,6 @@ int main() {
     if (stopsig) {
       continue;
     }
-
     // send over the values to the robot
     cout << "calibrated? " << arm.calibrated() << endl;
 
@@ -128,21 +126,19 @@ int main() {
     int k_k = key_pressed[KEYID('k')];
     int k_p = key_pressed[KEYID('p')];
     int k_l = key_pressed[KEYID('l')];
-
     if (velocity_en) {
       printf("velocity enabled\n");
-      arm_vel(0, 0) = (k_q - k_a);
-      arm_vel(0, 1) = (k_w - k_s);
-      arm_vel(0, 2) = (k_e - k_d);
-      arm_vel(0, 3) = (k_i - k_j);
-      arm_vel(0, 4) = (k_o - k_k);
-      arm_vel(0, 5) = (k_p - k_l);
+      arm_vel(0) = (k_q - k_a);
+      arm_vel(1) = (k_w - k_s);
+      arm_vel(2) = (k_e - k_d);
+      arm_vel(3) = (k_i - k_j);
+      arm_vel(4) = (k_o - k_k);
+      arm_vel(5) = (k_p - k_l);
     } else if (position_en) {
       printf("position enabled\n");
     } else {
       printf("everything disabled\n");
     }
-
     arm.move(arm_pos, arm_vel, position_en, velocity_en);
     // print out the feedback from the robot
     vec arm_sensors = arm.sense();

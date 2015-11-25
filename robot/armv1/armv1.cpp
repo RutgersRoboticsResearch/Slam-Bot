@@ -25,7 +25,7 @@ static double enc_transform(double mint, double maxt, double minv, double maxv, 
 static double secdiff(struct timeval &t1, struct timeval &t2);
 
 Arm::Arm() : BaseRobot(ARMV1) {
-  this->arm_read = zeros<mat>(1, DOF);
+  this->arm_read = zeros<vec>(DOF);
   this->arm_pos = zeros<mat>(1, 3);
   this->arm_mint = { -M_PI_2, -M_PI_2, -M_PI_4, -M_PI_2, -M_PI_2, 0.0 };
   this->arm_maxt = { M_PI_2, M_PI_2, M_PI_2, M_PI_2, M_PI_2, M_PI_2 };
@@ -39,7 +39,7 @@ Arm::Arm() : BaseRobot(ARMV1) {
   this->manager_running = false;
   this->buffered_arm_theta = zeros<mat>(1, DOF);
   this->buffered_arm_vel = zeros<mat>(1, DOF);
-  this->buffered_arm_sensors = zeros<mat>(1, DOF);
+  this->buffered_arm_sensors = zeros<vec>(DOF);
   this->buffered_arm_theta_en = false;
   this->buffered_arm_vel_en = false;
   memset(&this->prevwtime, 0, sizeof(struct timeval));
@@ -121,18 +121,17 @@ void Arm::send(
 
   // safety checks
   for (uword i = 0; i < DOF; i++) {
-    arm[i] = limitf(arm_theta(0, i), this->arm_mint(i), this->arm_maxt(i));
+    arm[i] = limitf(arm_theta(i), this->arm_mint(i), this->arm_maxt(i));
     if (this->calibrated()) {
       arm[i] = enc_transform(
           this->arm_mint(i), this->arm_maxt(i),
-          this->arm_minv(0, i), this->arm_maxv(0, i),
-          this->arm_rev(0, i), arm[i]);
+          this->arm_minv(i), this->arm_maxv(i),
+          this->arm_rev(i), arm[i]);
     } else {
       arm_theta_en = false;
     }
-    omega[i] = limitf(arm_vel(0, i), -1.0, 1.0);
+    omega[i] = limitf(arm_vel(i), -1.0, 1.0);
   }
-
   char instr_activate = 0x80 |
     ((arm_theta_en && this->calibrated()) ? 0x01 : 0x00) |
     (arm_vel_en ? 0x02 : 0x00);
@@ -266,9 +265,9 @@ void Arm::set_calibration_params(json cp) {
   for (int i = 0; i < DOF; i++) {
     string name = dofnames[i];
     int id = dofids[i];
-    this->arm_minv(0, id) = cp[name]["min"];
-    this->arm_maxv(0, id) = cp[name]["max"];
-    this->arm_rev(0, id) = cp[name]["reversed"] ? 1 : 0;
+    this->arm_minv(id) = cp[name]["min"];
+    this->arm_maxv(id) = cp[name]["max"];
+    this->arm_rev(id) = cp[name]["reversed"] ? 1 : 0;
   }
   this->calibration_loaded = true;
 }
@@ -299,7 +298,7 @@ void Arm::update_send() {
 }
 
 void Arm::update_recv() {
-  mat arm_sensors = this->recv();
+  vec arm_sensors = this->recv();
   this->rlock->lock();
   this->buffered_arm_sensors = arm_sensors;
   this->rlock->unlock();
@@ -322,6 +321,7 @@ vec Arm::sense() {
   this->rlock->lock();
   vec arm_sensors = this->buffered_arm_sensors;
   this->rlock->unlock();
+  cout << arm_sensors << endl;
   return arm_sensors;
 }
 

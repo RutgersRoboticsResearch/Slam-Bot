@@ -17,14 +17,13 @@
 #include <cstring>
 #include <ctime>
 #include <cmath>
+#include <cassert>
 #include <unistd.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include <termios.h>
-#include <assert.h>
 #include <vector>
 #include "tachikoma.h"
-#include "defs.h"
 
 #define WBUFSIZE  128
 #define NCOMCNTR  4
@@ -104,7 +103,6 @@ bool Tachikoma::connect(void) {
 }
 
 bool Tachikoma::connected(void) {
-  // TODO: change to 14 after testing
   return this->connections.size() == 14;
 }
 
@@ -136,8 +134,6 @@ void Tachikoma::reset(void) {
   this->leg_write.zeros();
   this->leg_read.zeros();
   this->leg_fback.zeros();
-  // be cautious about the following line:
-  // memset(this->thigh_signature, 0, sizeof(int) * 4);
 }
 
 void Tachikoma::send(const mat &leg_theta,
@@ -197,15 +193,6 @@ void Tachikoma::send(const mat &leg_theta,
               legid2 = UR;
               break;
           }
-//          if (this->leg_write(legid1, WAIST_POS) != leg[legid1][WAIST_POS] ||
-//              this->leg_write(legid2, WAIST_POS) != leg[legid2][WAIST_POS] ||
-//              this->leg_write(legid1, WAIST_VEL) != leg[legid1][WAIST_VEL] ||
-//              this->leg_write(legid2, WAIST_VEL) != leg[legid2][WAIST_VEL] ||
-//              this->instruction_activate != instr_activate) {
-//            this->leg_write(legid1, WAIST_POS) = leg[legid1][WAIST_POS];
-//            this->leg_write(legid2, WAIST_POS) = leg[legid2][WAIST_POS];
-//            this->leg_write(legid1, WAIST_VEL) = leg[legid1][WAIST_VEL];
-//            this->leg_write(legid2, WAIST_VEL) = leg[legid2][WAIST_VEL];
             sprintf(msg, "[%d %d %d %d %d]\n",
               instr_activate,
               (int)(leg[legid1][WAIST_POS]),
@@ -213,7 +200,6 @@ void Tachikoma::send(const mat &leg_theta,
               (int)(leg[legid1][WAIST_VEL] * 255.0),
               (int)(leg[legid2][WAIST_VEL] * 255.0));
             serial_write(this->connections[i], msg);
-//          }
           break;
 
         // thigh
@@ -222,17 +208,11 @@ void Tachikoma::send(const mat &leg_theta,
         case THIGH_DL:
         case THIGH_DR:
           legid1 = devid - THIGH_UL;
-//          if (this->leg_write(legid1, THIGH_POS) != leg[legid1][THIGH_POS] ||
-//              this->leg_write(legid1, THIGH_VEL) != leg[legid1][THIGH_VEL] ||
-//              this->instruction_activate != instr_activate) {
-//            this->leg_write(legid1, THIGH_POS) = leg[legid1][THIGH_POS];
-//            this->leg_write(legid1, THIGH_VEL) = leg[legid1][THIGH_VEL];
             sprintf(msg, "[%d %d %d]\n",
               instr_activate,
               (int)(leg[legid1][THIGH_POS]),
               (int)(leg[legid1][THIGH_VEL] * 255.0));
             serial_write(this->connections[i], msg);
-//          }
           break;
 
         // knee
@@ -242,17 +222,11 @@ void Tachikoma::send(const mat &leg_theta,
         case KNEE_DR:
           // speed hack (will change with definition changes)
           legid1 = devid - KNEE_UL;
-//          if (this->leg_write(legid1, KNEE_POS) != leg[legid1][KNEE_POS] ||
-//              this->leg_write(legid1, KNEE_VEL) != leg[legid1][KNEE_VEL] ||
-//              this->instruction_activate != instr_activate) {
-//            this->leg_write(legid1, KNEE_POS) = leg[legid1][KNEE_POS];
-//            this->leg_write(legid1, KNEE_VEL) = leg[legid1][KNEE_VEL];
             sprintf(msg, "[%d %d %d]\n",
               instr_activate,
               (int)(leg[legid1][KNEE_POS]),
               (int)(leg[legid1][KNEE_VEL] * 255.0));
             serial_write(this->connections[i], msg);
-//          }
           break;
 
         // wheel
@@ -262,12 +236,9 @@ void Tachikoma::send(const mat &leg_theta,
         case WHEEL_DR:
           // speed hack (will change with definition changes)
           legid1 = devid - WHEEL_UL;
-//          if (this->leg_write(legid1, WHEEL_VEL) != leg[legid1][WHEEL_VEL]) {
-//            this->leg_write(legid1, WHEEL_VEL) = leg[legid1][WHEEL_VEL];
             sprintf(msg, "[%d]\n",
               (int)(leg[legid1][WHEEL_VEL] * 255.0));
             serial_write(this->connections[i], msg);
-//          }
           break;
         default:
           break;

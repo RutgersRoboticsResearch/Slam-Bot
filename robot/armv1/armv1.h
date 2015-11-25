@@ -28,7 +28,7 @@ class Arm : public BaseRobot {
     bool calibrated();
 
     /* update on recv */
-    arma::mat arm_read;
+    arma::vec arm_read;
     arma::mat arm_pos;
     /* parameters */
     arma::mat arm_mint;
@@ -59,7 +59,7 @@ class Arm : public BaseRobot {
     arma::mat buffered_arm_vel;
     bool buffered_arm_theta_en;
     bool buffered_arm_vel_en;
-    arma::mat buffered_arm_sensors;
+    arma::vec buffered_arm_sensors;
     struct timeval prevwtime;
 
     bool calibration_loaded;

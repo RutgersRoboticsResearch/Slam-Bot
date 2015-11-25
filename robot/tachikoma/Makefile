@@ -20,18 +20,9 @@ tachikoma.o: tachikoma.cpp
 test.o: test.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) -o $@ -c $<
 
-xboxctrl.o: xboxctrl.c
-	$(CC) $(CFLAGS) $(INCLUDE) -o $@ -c $<
-
 test: $(BASEROBOT)/baserobot.o $(OBJECTS) $(SERIAL)/serial.o test.o
 	$(CC) $(CFLAGS) $(INCLUDE) -o $@ $^ $(LIBS)
 
-calibrate.o: calibrate.cpp
-	$(CC) $(CFLAGS) $(INCLUDE) -o $@ -c $<
-
-calibrate: $(BASEROBOT)/baserobot.o $(OBJECTS) $(SERIAL)/serial.o calibrate.o
-	$(CC) $(CFLAGS) $(INCLUDE) -o $@ $^ $(LIBS)
-
 clean:
-	rm -f $(OBJECTS) $(SUBOBJS) xboxctrl.o test.o test
+	rm -f $(OBJECTS) $(SUBOBJS) test.o test
 	$(foreach directory, $(SUBDIRS), make clean -C $(directory);)

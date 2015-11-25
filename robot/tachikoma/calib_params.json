@@ -1,13 +1,13 @@
 {
   "dl": {
     "knee": {
-      "max":695,
-      "min":97,
+      "max":720,
+      "min":112,
       "reversed":true
     },
     "thigh": {
-      "max":708,
-      "min":308,
+      "max":738,
+      "min":338,
       "reversed":true
     },
     "waist": {
@@ -35,8 +35,8 @@
   },
   "ul": {
     "knee": {
-      "max":699,
-      "min":80,
+      "max":729,
+      "min":100,
       "reversed":true
     },
     "thigh": {
@@ -52,13 +52,13 @@
   },
   "ur": {
     "knee": {
-      "max":718,
-      "min":99,
+      "max":728,
+      "min":109,
       "reversed":true
     },
     "thigh": {
-      "max":721,
-      "min":305,
+      "max":696,
+      "min":280,
       "reversed":true
     },
     "waist": {

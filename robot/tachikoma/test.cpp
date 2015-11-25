@@ -1,5 +1,3 @@
-#include "tachikoma.h"
-#include "defs.h"
 #include <iostream>
 #include <signal.h>
 #include <SDL/SDL.h>
@@ -7,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <njson/json.hpp>
+#include "tachikoma.h"
 
 #define FPS 25
 #define KEYID(k) ((k)-'a')
@@ -59,6 +58,8 @@ int main() {
   int legid = 0;
   bool position_en = false;
   bool velocity_en = false;
+  int standstate = 0;
+  int dposestate = 0;
   memset(key_pressed, 0, 26 * sizeof(char));
   while (!stopsig) {
     SDL_Event event;
@@ -98,12 +99,12 @@ int main() {
         } break;
         case SDL_KEYUP: {
           switch (event.key.keysym.sym) {
-            case SDLK_u: key_pressed[KEYID('u')] = 0; break;
-            case SDLK_h: key_pressed[KEYID('h')] = 0; break;
-            case SDLK_i: key_pressed[KEYID('i')] = 0; break;
-            case SDLK_j: key_pressed[KEYID('j')] = 0; break;
-            case SDLK_o: key_pressed[KEYID('o')] = 0; break;
-            case SDLK_k: key_pressed[KEYID('k')] = 0; break;
+            case SDLK_u: key_pressed[KEYID('u')] = 0; dposestate = 1; break;
+            case SDLK_h: key_pressed[KEYID('h')] = 0; dposestate = 0; break;
+            case SDLK_i: key_pressed[KEYID('i')] = 0; standstate = 1; break;
+            case SDLK_j: key_pressed[KEYID('j')] = 0; standstate = 0; break;
+            case SDLK_o: key_pressed[KEYID('o')] = 0; standstate = -1; break;
+            case SDLK_k: key_pressed[KEYID('k')] = 0; standstate = 0; break;
             case SDLK_p: key_pressed[KEYID('p')] = 0; break;
             case SDLK_l: key_pressed[KEYID('l')] = 0; break;
             case SDLK_q: key_pressed[KEYID('q')] = 0; break;
@@ -152,9 +153,9 @@ int main() {
       printf("position en\n");
       double coeff[] = { -1.0, 1.0, 1.0, -1.0 };
       for (int i = 0; i < NUM_LEGS; i++) {
-        leg_pos(i, WAIST) = (k_u) * M_PI_4 * coeff[i];
-        leg_pos(i, THIGH) = (k_i - k_j) * M_PI_4 / 2;
-        leg_pos(i, KNEE) =  (k_i - k_j) * M_PI_4 / 2;
+        leg_pos(i, WAIST) = (double)(dposestate) * M_PI_4 * coeff[i];
+        leg_pos(i, THIGH) = (double)(standstate) * M_PI_4 / 2;
+        leg_pos(i, KNEE) =  (double)(standstate) * M_PI_4 / 2;
         switch (i) {
           case UL:
             wheels(i) = k_w - k_a - k_s + k_d - k_q + k_e;
