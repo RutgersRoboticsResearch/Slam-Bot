@@ -7,6 +7,7 @@
 #define NO_ROBOT            0x00000000
 #define TENNIS_BALL_ROBOT   0x00000002
 #define TACHIKOMA           0x00000003
+#define ARMV1               0x00000005
 
 class BaseRobot {
   public:

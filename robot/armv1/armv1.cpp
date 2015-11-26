@@ -77,7 +77,7 @@ bool Arm::connect() {
 }
 
 bool Arm::connected() {
-  return this->connections.size() == 3;
+  return this->connections.size() > 0;
 }
 
 int Arm::numConnected() {
@@ -321,21 +321,11 @@ vec Arm::sense() {
   this->rlock->lock();
   vec arm_sensors = this->buffered_arm_sensors;
   this->rlock->unlock();
-  cout << arm_sensors << endl;
   return arm_sensors;
 }
 
-/** PRIVATE FUNCTIONS **/
+/** STATIC FUNCTIONS **/
 
-/** Limit an a value between a range (double)
- *  @param value
- *    the value to be limited
- *  @param min_value
- *    minimum value
- *  @param max_value
- *    maximum value
- *  @return the limited value
- */
 static double limitf(double value, double min_value, double max_value) {
   if (value < min_value) {
     return min_value;
@@ -346,15 +336,6 @@ static double limitf(double value, double min_value, double max_value) {
   }
 }
 
-/** Cosine rule for finding an angle
- *  @param A
- *    side1
- *  @param B
- *    side2
- *  @param C
- *    side3
- *  @return angle perpendicular to side3
- */
 //static double cos_rule_angle(double A, double B, double C) {
 //  return acos((A * A + B * B - C * C) / (2.0 * A * B));
 //}

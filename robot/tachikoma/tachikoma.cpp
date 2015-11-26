@@ -34,9 +34,9 @@ using namespace std;
 using json = nlohmann::json;
 
 static double limitf(double value, double min_value, double max_value);
-static double cos_rule_angle(double A, double B, double C);
+//static double cos_rule_angle(double A, double B, double C);
 static double enc_transform(int jointid, double minv, double maxv, int reversed, double value);
-static void device_update(void *tachikoma);
+static double secdiff(struct timeval &t1, struct timeval &t2);
 
 /** CLASS FUNCTIONS **/
 
@@ -48,8 +48,7 @@ Tachikoma::Tachikoma(void) : BaseRobot(TACHIKOMA) {
   this->leg_min = zeros<mat>(NUM_LEGS, NUM_JOINTS);
   this->leg_max = zeros<mat>(NUM_LEGS, NUM_JOINTS);
   this->leg_rev = zeros<umat>(NUM_LEGS, NUM_JOINTS);
-  this->calibration_loaded = false;
-  this->instruction_activate = 0;
+  this->uctrl_manager = NULL;
   this->read_lock = NULL;
   this->write_lock = NULL;
   this->manager_running = false;
@@ -61,6 +60,8 @@ Tachikoma::Tachikoma(void) : BaseRobot(TACHIKOMA) {
   this->buffered_leg_vel_act = false;
   this->buffered_leg_sensors = zeros<mat>(NUM_LEGS, NUM_JOINTS + 1);
   this->buffered_leg_feedback = zeros<mat>(NUM_LEGS, NUM_JOINTS * 2 + 1);
+  this->calibration_loaded = false;
+  this->instruction_activate = 0;
   memset(&this->prevwritetime, 0, sizeof(struct timeval));
   gettimeofday(&this->prevwritetime, NULL);
 }
@@ -97,7 +98,7 @@ bool Tachikoma::connect(void) {
     this->write_lock = new mutex;
     // start a runnable thread to query devices
     this->manager_running = true;
-    this->device_manager = new thread(device_update, this);
+    this->uctrl_manager = new thread(&Tachikoma::uctrl_manager, this);
   }
   return this->connected();
 }
@@ -115,9 +116,9 @@ void Tachikoma::disconnect(void) {
     // signal the manager to stop updating
     this->manager_running = false;
     // wait until the device manager can join back to the parent thread
-    this->device_manager->join();
-    delete this->device_manager;
-    this->device_manager = NULL;
+    this->uctrl_manager->join();
+    delete this->uctrl_manager;
+    this->uctrl_manager = NULL;
   }
   BaseRobot::disconnect();
   if (this->read_lock) {
@@ -136,12 +137,13 @@ void Tachikoma::reset(void) {
   this->leg_fback.zeros();
 }
 
-void Tachikoma::send(const mat &leg_theta,
-                     const mat &leg_vel,
-                     const vec &wheels,
-                     const mat &arm_theta,
-                     bool leg_theta_act,
-                     bool leg_vel_act) {
+void Tachikoma::send(
+    const mat &leg_theta,
+    const mat &leg_vel,
+    const vec &wheels,
+    const mat &arm_theta,
+    bool leg_theta_act,
+    bool leg_vel_act) {
   assert(leg_theta.n_rows == NUM_LEGS && leg_theta.n_cols == NUM_JOINTS);
   assert(leg_vel.n_rows == NUM_LEGS && leg_vel.n_cols == NUM_JOINTS);
   assert(wheels.n_elem == NUM_LEGS);
@@ -250,7 +252,9 @@ void Tachikoma::send(const mat &leg_theta,
   this->instruction_activate = instr_activate;
 }
 
-vec Tachikoma::recv(mat &leg_sensors, mat &leg_feedback) {
+vec Tachikoma::recv(
+    mat &leg_sensors,
+    mat &leg_feedback) {
   char *msg;
   int devid;
   int legid1;
@@ -376,7 +380,9 @@ void Tachikoma::set_calibration_params(json cp) {
   this->calibration_loaded = true;
 }
 
-vec Tachikoma::leg_fk_solve(const vec &enc, int legid) {
+// Note: the following is unnecessary for now
+
+/*vec Tachikoma::leg_fk_solve(const vec &enc, int legid) {
   double cosv;
   double sinv;
 
@@ -430,16 +436,43 @@ vec Tachikoma::leg_ik_solve(const vec &pos, const vec &enc, int legid) {
   delta(THIGH_POS) = cos_rule_angle(thigh_length, r, knee_length) - atan2(z, x) - enc(THIGH_POS);
 
   return delta;
-}
+}*/
 
 bool Tachikoma::calibrated(void) {
   return this->calibration_loaded;
 }
 
-double secdiff(struct timeval &t1, struct timeval &t2) {
-  double usec = (double)(t2.tv_usec - t1.tv_usec) / 1000000.0;
-  double sec = (double)(t2.tv_sec - t1.tv_sec);
-  return sec + usec;
+void Tachikoma::move(
+    const mat &leg_theta,
+    const mat &leg_vel,
+    const vec &wheels,
+    const mat &arm_theta,
+    bool leg_theta_act,
+    bool leg_vel_act) {
+  this->write_lock->lock();
+  this->buffered_leg_theta = leg_theta;
+  this->buffered_leg_vel = leg_vel;
+  this->buffered_wheels = wheels;
+  this->buffered_arm_theta = arm_theta;
+  this->buffered_leg_theta_act = leg_theta_act;
+  this->buffered_leg_vel_act = leg_vel_act;
+  this->write_lock->unlock();
+}
+
+void Tachikoma::sense(
+    mat &leg_sensors,
+    mat &leg_feedback) {
+  this->read_lock->lock();
+  leg_sensors = this->buffered_leg_sensors;
+  leg_feedback = this->buffered_leg_feedback;
+  this->read_lock->unlock();
+}
+
+void Tachikoma::update_uctrl(void) {
+  while (this->manager_running) {
+    this->update_send();
+    this->update_recv();
+  }
 }
 
 void Tachikoma::update_send(void) {
@@ -472,40 +505,8 @@ void Tachikoma::update_recv(void) {
   this->read_lock->unlock();
 }
 
-void Tachikoma::move(const mat &leg_theta,
-                     const mat &leg_vel,
-                     const vec &wheels,
-                     const mat &arm_theta,
-                     bool leg_theta_act,
-                     bool leg_vel_act) {
-  this->write_lock->lock();
-  this->buffered_leg_theta = leg_theta;
-  this->buffered_leg_vel = leg_vel;
-  this->buffered_wheels = wheels;
-  this->buffered_arm_theta = arm_theta;
-  this->buffered_leg_theta_act = leg_theta_act;
-  this->buffered_leg_vel_act = leg_vel_act;
-  this->write_lock->unlock();
-}
+/** STATIC FUNCTIONS **/
 
-void Tachikoma::sense(mat &leg_sensors, mat &leg_feedback) {
-  this->read_lock->lock();
-  leg_sensors = this->buffered_leg_sensors;
-  leg_feedback = this->buffered_leg_feedback;
-  this->read_lock->unlock();
-}
-
-/** PRIVATE FUNCTIONS **/
-
-/** Limit an a value between a range (double)
- *  @param value
- *    the value to be limited
- *  @param min_value
- *    minimum value
- *  @param max_value
- *    maximum value
- *  @return the limited value
- */
 static double limitf(double value, double min_value, double max_value) {
   if (value < min_value) {
     return min_value;
@@ -516,18 +517,9 @@ static double limitf(double value, double min_value, double max_value) {
   }
 }
 
-/** Cosine rule for finding an angle
- *  @param A
- *    side1
- *  @param B
- *    side2
- *  @param C
- *    side3
- *  @return angle perpendicular to side3
- */
-static double cos_rule_angle(double A, double B, double C) {
-  return acos((A * A + B * B - C * C) / (2.0 * A * B));
-}
+//static double cos_rule_angle(double A, double B, double C) {
+//  return acos((A * A + B * B - C * C) / (2.0 * A * B));
+//}
 
 static double enc_transform(int jointid, double minv, double maxv, int reversed, double value) {
   double enc_range = maxv - minv;
@@ -554,10 +546,8 @@ static double enc_transform(int jointid, double minv, double maxv, int reversed,
   return (value - rad[0]) * ratio + minv;
 }
 
-static void device_update(void *tachikoma) {
-  Tachikoma *bot = (Tachikoma *)tachikoma;
-  while (bot->manager_running) {
-    bot->update_send();
-    bot->update_recv();
-  }
+static double secdiff(struct timeval &t1, struct timeval &t2) {
+  double usec = (double)(t2.tv_usec - t1.tv_usec) / 1000000.0;
+  double sec = (double)(t2.tv_sec - t1.tv_sec);
+  return sec + usec;
 }

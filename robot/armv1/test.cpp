@@ -128,12 +128,14 @@ int main() {
     int k_l = key_pressed[KEYID('l')];
     if (velocity_en) {
       printf("velocity enabled\n");
+      printf("Controls:\n");
       arm_vel(0) = (k_q - k_a);
       arm_vel(1) = (k_w - k_s);
       arm_vel(2) = (k_e - k_d);
       arm_vel(3) = (k_i - k_j);
       arm_vel(4) = (k_o - k_k);
       arm_vel(5) = (k_p - k_l);
+      cout << arm_vel << endl;
     } else if (position_en) {
       printf("position enabled\n");
     } else {
@@ -142,6 +144,7 @@ int main() {
     arm.move(arm_pos, arm_vel, position_en, velocity_en);
     // print out the feedback from the robot
     vec arm_sensors = arm.sense();
+    printf("SENSORS:\n");
     std::cout << arm_sensors.t() << std::endl;
 
     // render screen

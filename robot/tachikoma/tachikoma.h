@@ -83,19 +83,22 @@ class Tachikoma : public BaseRobot {
      *  @param leg_theta_act (optional) a boolean representing the position enable
      *  @param leg_vel_act (optional) a boolean representing the velocity enable
      */
-    void send(const arma::mat &leg_theta,
-              const arma::mat &leg_vel,
-              const arma::vec &wheels,
-              const arma::mat &arm_theta,
-              bool leg_theta_act = false,
-              bool leg_vel_act = true);
+    void send(
+        const arma::mat &leg_theta,
+        const arma::mat &leg_vel,
+        const arma::vec &wheels,
+        const arma::mat &arm_theta,
+        bool leg_theta_act = false,
+        bool leg_vel_act = true);
 
     /** Receive a matrix of sensor values from the legs, indicating (for now) angles and touch
      *  @param leg_sensors a generic 4x4 matrix representing the theta and distances of the legs
      *  @param leg_feedback a generic 4x4 matrix representing the vectors of the motors
      *  @return for compatability, returns a vector of all sensor values
      */
-    arma::vec recv(arma::mat &leg_sensors, arma::mat &leg_feedback);
+    arma::vec recv(
+        arma::mat &leg_sensors,
+        arma::mat &leg_feedback);
 
     /** Reset the robot's default values
      */
@@ -107,6 +110,11 @@ class Tachikoma : public BaseRobot {
      */
     bool set_calibration_params(const std::string &filename);
     void set_calibration_params(nlohmann::json cp);
+
+    /** Detect if a robot has been calibrated
+     *  @return true if calibration parameters are found, false otherwise
+     */
+    bool calibrated(void);
 
     /** Solve the xyz coordinate of the leg using forward kinematics
      *  @param waist, thigh, knee
@@ -128,20 +136,18 @@ class Tachikoma : public BaseRobot {
      */
     arma::vec leg_ik_solve(const arma::vec &pos, const arma::vec &enc, int legid);
 
-    /** Detect if a robot has been calibrated
-     *  @return true if calibration parameters are found, false otherwise
-     */
-    bool calibrated(void);
-
     /** threaded versions of send and recv
      */
-    void move(const arma::mat &leg_theta,
-              const arma::mat &leg_vel,
-              const arma::vec &wheels,
-              const arma::mat &arm_theta,
-              bool leg_theta_act = false,
-              bool leg_vel_act = true);
-    void sense(arma::mat &leg_sensors, arma::mat &leg_feedback);
+    void move(
+        const arma::mat &leg_theta,
+        const arma::mat &leg_vel,
+        const arma::vec &wheels,
+        const arma::mat &arm_theta,
+        bool leg_theta_act = false,
+        bool leg_vel_act = true);
+    void sense(
+        arma::mat &leg_sensors,
+        arma::mat &leg_feedback);
 
     // updated on send
     arma::mat leg_write;
@@ -155,16 +161,17 @@ class Tachikoma : public BaseRobot {
     arma::mat leg_max;
     arma::umat leg_rev;
 
+  private:
+    // update manager
+    std::thread *uctrl_manager;
+    std::mutex *read_lock;
+    std::mutex *write_lock;
     // used for the device update
     bool manager_running;
+    void update_uctrl(void);
     void update_send(void);
     void update_recv(void);
 
-  private:
-    // update manager
-    std::thread *device_manager;
-    std::mutex *read_lock;
-    std::mutex *write_lock;
     arma::mat buffered_leg_theta;
     arma::mat buffered_leg_vel;
     arma::mat buffered_wheels;
