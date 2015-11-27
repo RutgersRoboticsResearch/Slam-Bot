@@ -88,6 +88,8 @@ uint8_t *gridnode_reference(gridnode_t *node, int x, int y, int allow_create) {
       new_node->map = NULL;
       // making the assumption that the structure is a quad starting at 0 in at least min or max
       // not a general purpose algorithm
+      // radix algorithm:
+      //
       new_node->min_x = g->min_x * g->n_cols;
       new_node->max_x = g->max_x * g->n_cols;
       new_node->min_y = g->min_y * g->n_rows;
@@ -192,33 +194,17 @@ static void gridnode_load(gridnode_t *node, char *filepath,
 static void gridnode_store(gridnode_t *node, char *foldername, FILE *infofile) {
   char filename[256];
   int datafd;
-  SDL_Surface *image;
   int i;
   int j;
   if (!node->map) {
     return;
   }
   fprintf(infofile, "L%dR%dD%dU%d\n", node->min_x, node->max_x, node->min_y, node->max_y);
-  // write to a file
   sprintf(filename, "%s/L%dR%dD%dU%d.txt", foldername,
       node->min_x, node->max_x, node->min_y, node->max_y);
   datafd = open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
   write(datafd, (void *)node->map, sizeof(uint8_t) * node->n_rows * node->n_cols);
   close(datafd);
-  // write to an image
-  image = SDL_CreateRGBSurface(0, node->n_rows, node->n_cols, 32, 0, 0, 0, 0);
-  for (i = 0; i < node->n_rows; i++) {
-    for (j = 0; j < node->n_cols; j++) {
-      uint8_t color;
-      color = node->map[gridnode_getIndex(node, j, i)];
-      ((uint32_t *)image->pixels)[i * node->n_cols + j] =
-        SDL_MapRGB(image->format, color, color, color);
-    }
-  }
-  sprintf(filename, "%s/L%dR%dD%dU%d.bmp", foldername,
-      node->min_x, node->max_x, node->min_y, node->max_y);
-  SDL_SaveBMP(image, filename);
-  SDL_FreeSurface(image);
 }
 
 static int gridmap_getQuad(gridmap_t *map, int x, int y) {

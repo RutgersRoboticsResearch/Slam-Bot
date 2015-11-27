@@ -1,28 +1,112 @@
 #include <cmath>
-#include "gridmap.hpp"
+#include <fstream>
+#include <iostream>
+#include "gridmap.h"
 
-GridMap::GridMap(void) {
-  this->map = new gridmap_t;
-  gridmap_create(this->map);
+using namespace std;
+
+GridNode::GridNode(int min_x, int max_x, int min_y, int max_y,
+    GridMap *env, GridNode *parent, size_t unitsize) {
+  this->min_x = min_x;
+  this->max_x = max_x;
+  this->min_y = min_y;
+  this->max_y = max_y;
+  this->env = env;
+  this->parent = parent;
+  this->unitsize = unitsize;
 }
 
+// FINISHED
+GridMap::GridMap(size_t blocksize, size_t maxmaps) {
+  this->blocksize = blocksize;
+  // create the nodes
+  quad[0] = new GridNode(blocksize, 0, blocksize, 0);
+  quad[1] = new GridNode(-blocksize, 0, blocksize, 0);
+  quad[2] = new GridNode(blocksize, 0, -blocksize, 0);
+  quad[3] = new GridNode(-blocksize, 0, -blocksize, 0);
+  // place the nodes into the gridspace
+  for (int i = 0; i < 4; i++) {
+    grids.push_back(quad[i]);
+  }
+}
+
+// FINISHED
 GridMap::~Gridmap(void) {
-  gridmap_destroy(this->map); 
+  this->reset();
 }
 
-double GridMap::get(double x, double y) {
-  return gridmap_get(this->map, (int)round(x), (int)round(y));
+GridMap::reset(void) {
+  for (GridNode *grid : this->grids) {
+    delete grid;
+  }
+  this->grids.clear();
+  for (int i = 0; i < 4; i++) {
+    quad[i] = NULL;
+  }
 }
 
-double GridMap::set(double x, double y, double v) {
-  gridmap_set(this->map, x, y, v);
+// FINISHED
+bool GridMap::get(int x, int y, double &v) {
+  uint8_t *cell = this->quad[this->getQuad(x, y)]->at(x, y, false);
+  v = cell ? (double)(*cell) / (double)255 : 0.0;
+  return cell != NULL;
 }
 
-double GridMap::load(const std::string &foldername) {
-  gridmap_load(this->map, foldername.c_str());
+// FINISHED
+bool GridMap::set(double x, double y, double v) {
+  uint8_t *cell = this->quad[this->getQuad(x, y)]->at(x, y, true);
+  if (cell) {
+    *cell = (uint8_t)(limit(v, 0.0, 1.0) * 255);
+  }
+  return cell != NULL;
 }
 
-double GridMap::store(const std::string &foldername) {
+void GridMap::load(const std::string &foldername) {
+  // reset this map
+  this->reset();
+
+  // make the foldername a proper foldername
+  if (foldername[foldername.length()-1] != '/') {
+    foldername += "/";
+  }
+
+  // open the infofile
+  ifstream infofile;
+  infofile.open(foldername + "info.txt");
+  if (!infofile.is_open()) {
+    cerr << "Could not open " + foldername + "info.txt" << endl;
+    return;
+  }
+  
+  // read the information
+  int nmaps;
+  int blocksize;
+  string line;
+  getline(infofile, line);
+  if (line.length() > 0) {
+    sscanf(line.c_str(), "blocksize: %d\n", &blocksize);
+  } else {
+    cerr << "Could not read the blocksize from " + foldername + "info.txt" << endl;
+    return;
+  }
+  getline(infofile, line);
+  if (line.length() > 0) {
+    sscanf(line.c_str(), "nmaps: %d\n", &nmaps);
+  }
+
+  // load all the maps
+  int left, right, up, down;
+  for (int i = 0; i < nmaps; i++) {
+    getline(infofile, line);
+    if (line.length() > 0) {
+      sscanf(line.c_str(), "L%dR%dU%dD%d\n", &left, &right, &up, &down);
+    }
+    // use the left and up to determine which quad this map belongs in
+    this->quad[this->getQuad(left, up)]->load(foldername + line);
+  }
+}
+
+void GridMap::store(const std::string &foldername) {
   gridmap_store(this->map, foldername.c_str());
 }
 
