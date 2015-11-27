@@ -88,8 +88,6 @@ uint8_t *gridnode_reference(gridnode_t *node, int x, int y, int allow_create) {
       new_node->map = NULL;
       // making the assumption that the structure is a quad starting at 0 in at least min or max
       // not a general purpose algorithm
-      // radix algorithm:
-      //
       new_node->min_x = g->min_x * g->n_cols;
       new_node->max_x = g->max_x * g->n_cols;
       new_node->min_y = g->min_y * g->n_rows;
