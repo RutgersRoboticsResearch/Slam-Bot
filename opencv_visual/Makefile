@@ -19,7 +19,7 @@ capture: capture.cpp
 	$(CXX) $(CFLAGS) -o $@ $^ $(LIBS)
 
 calibrate: calibrate.cpp
-	$(CXX) $(CFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(CFLAGS) -o $@ $^ $(LIBS) -g
 
 stereo.o: stereo.cpp
 	$(CXX) $(CFLAGS) -o $@ -c $<
