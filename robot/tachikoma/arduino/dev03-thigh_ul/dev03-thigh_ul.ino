@@ -33,7 +33,7 @@ int limit(int x, int a, int b) {
 
 void setmotors(int v) {
   bool isneg = v < 0;
-  v = limit(abs(v), 0, 128);
+  v = limit(abs(v), 0, 255);
   motors[0]->setSpeed(v);
   motors[1]->setSpeed(v);
   motors[2]->setSpeed(v);
