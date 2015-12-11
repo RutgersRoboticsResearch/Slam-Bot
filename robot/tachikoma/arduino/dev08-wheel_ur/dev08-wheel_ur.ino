@@ -3,14 +3,70 @@
 #include "utility/Adafruit_PWMServoDriver.h"
 #include <string.h>
 
-#define DEV_ID 5
+#define DEV_ID 8
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motors[4];
 static int v;
-static int instr_activate;
-static bool leg_theta_act;
-static bool leg_vel_act;
+
+class QuadEncoder {
+  public:
+    long long pos;
+    bool reversed; // set
+    char pin[2];
+    QuadEncoder() {
+      reset();
+    }
+    int attach(int pin1, int pin2) {
+      pinMode(pin1, INPUT);
+      pinMode(pin2, INPUT);
+      pin[0] = pin1;
+      pin[1] = pin2;
+      pin_state[0] = digitalRead(pin[0]) == HIGH;
+      pin_state[1] = digitalRead(pin[1]) == HIGH;
+    }
+    int read() {
+      update();
+      return pos;
+    }
+    void reset() {
+      pin[0] = 0;
+      pin[1] = 0;
+      pos = 0;
+      velocity = 1; // velocity can either be 1 or -1
+      reversed = false;
+      pin_state[0] = 0;
+      pin_state[1] = 0;
+    }
+  private:
+    void update() {
+      if (pin[0] == 0 || pin[1] == 0)
+        return;
+      // FSA : reg :: 00 01 11 10
+      //     : rev :: 00 10 11 01
+      char new_state[2] = {
+        digitalRead(pin[0]) == HIGH,
+        digitalRead(pin[1]) == HIGH
+      };
+      char delta_state[2] = {
+        new_state[0] != pin_state[0],
+        new_state[1] != pin_state[1]
+      };
+      if (delta_state[0] && delta_state[1]) {
+        pos += velocity * 2 * (reversed ? -1 : 1);
+      } else if (delta_state[1]) {
+        velocity = (new_state[0] == new_state[1]) ? -1 : 1;
+        pos += velocity * (reversed ? -1 : 1);
+      } else if (delta_state[0]) {
+        velocity = (new_state[0] == new_state[1]) ? 1 : -1;
+        pos += velocity * (reversed ? -1 : 1);
+      }
+      pin_state[0] = new_state[0];
+      pin_state[1] = new_state[1];
+    }
+    char pin_state[2];
+    long long velocity;  // estimated
+} enc;
 
 const int bufsize = 256;
 const int safesize = bufsize / 2;
@@ -43,7 +99,7 @@ void setmotors(int v) {
     motors[1]->run(RELEASE);
     motors[2]->run(RELEASE);
     motors[3]->run(RELEASE);
-  } else if (!isneg) {
+  } else if (isneg) {
     motors[0]->run(FORWARD);
     motors[1]->run(BACKWARD);
     motors[2]->run(BACKWARD);
@@ -62,7 +118,7 @@ void setup() {
   motors[2] = AFMS.getMotor(3);
   motors[3] = AFMS.getMotor(4);
 
-  pinMode(A0, INPUT);
+  enc.attach(4, 5);
 
   pinMode(13, OUTPUT); // set status LED to OUTPUT and HIGH
   digitalWrite(13, HIGH);
@@ -76,7 +132,6 @@ void setup() {
 
 static int targetv;
 static int prevv;
-static int targetp;
 
 void loop() {
   int nbytes = 0;
@@ -98,12 +153,8 @@ void loop() {
       e[0] = '\0';
       if ((s = strrchr(buf, '['))) {
         // CUSTOMIZE
-        sscanf(s, "[%d %d %d]\n",
-          &instr_activate,
-          &targetp,
+        sscanf(s, "[%d]\n",
           &targetv);
-        leg_theta_act = instr_activate & 0x01;
-        leg_vel_act = (instr_activate & 0x02) >> 1;
         timeout = millis();
       }
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
@@ -117,21 +168,16 @@ void loop() {
     prevv = 0;
   }
 
-  if (leg_vel_act) {
-    // do nothing, this will override all the later statements
-  } else if (leg_theta_act) {
-    targetv = (targetp - analogRead(A0)) * 3;
-  }
-
-  int deltav = limit(targetv - prevv, -4, 4);
+  int deltav = limit(targetv - prevv, -1, 1);
   v = limit(prevv + deltav, -255, 255);
   setmotors(v);
   prevv = v;
+  enc.read();
 
   if (millis() - msecs > 100) {
     sprintf(wbuf, "[%d %d %d]\n",
       DEV_ID,
-      analogRead(A0),
+      enc.read(),
       v);
     Serial.print(wbuf);
     msecs = millis();

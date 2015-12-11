@@ -43,7 +43,7 @@ void setmotors(int v) {
     motors[1]->run(RELEASE);
     motors[2]->run(RELEASE);
     motors[3]->run(RELEASE);
-  } else if (isneg) {
+  } else if (!isneg) {
     motors[0]->run(FORWARD);
     motors[1]->run(BACKWARD);
     motors[2]->run(BACKWARD);
