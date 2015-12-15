@@ -37,7 +37,9 @@ mat barrel_distort(const mat &F, double offset_x) {
       double distortion = distortionScale(vec({ y, x }));
       int _i = (int)round(distortion*y*r_max+r_y);
       int _j = (int)round((distortion*x-offset_x)*r_max+r_x);
-      G(i, j) = F(_i, _j);
+      if (_i >= 0 && _i < F.n_rows && _j >= 0 && _j < F.n_cols) {
+        G(i, j) = F(_i, _j);
+      }
     }
   }
   return G;
@@ -57,5 +59,5 @@ cube ovr_image(const cube &left, const cube &right, double offset_x) {
   cube combined(l.n_rows, l.n_cols + r.n_cols, l.n_slices);
   combined(span::all, span(0, l.n_cols-1), span::all) = l;
   combined(span::all, span(l.n_cols, l.n_cols+r.n_cols-1), span::all) = r;
-  return imresize2rgb(combined, 800, 1200);
+  return imresize2(combined, 800, 1200);
 }

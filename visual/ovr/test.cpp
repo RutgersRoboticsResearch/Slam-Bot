@@ -34,7 +34,7 @@ int main() {
   cv::namedWindow("hud");
   cv::Mat frames[2];
   double offset = 0.15;
-  gcube limg, rimg, combined;
+  arma::cube limg, rimg, combined;
 
   for (;;) {
     left.read(frames[0]);
@@ -44,15 +44,10 @@ int main() {
       continue;
     }
     // statically mapped numbers - assumption is that the frame is going to be 480x640 big
-    /*if (swapped) {
-      limg.create(frames[1], 128, 511, 0, 480);
-      rimg.create(frames[0], 128, 511, 0, 480);
-    } else {*/
-      limg.create(frames[0], 128, 511, 0, 480);
-      rimg.create(frames[1], 128, 511, 0, 480);
-//    }
+    limg.create(frames[0], 128, 511, 0, 480);
+    rimg.create(frames[1], 128, 511, 0, 480);
     combined = ovr_image(limg, rimg, offset); // waste copy
-    disp_gcube("hud", combined);
+    disp_image("hud", combined);
     if (disp_keyPressed() >= 0) {
       break;
     }

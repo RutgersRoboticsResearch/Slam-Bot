@@ -5,28 +5,20 @@
 
 #define DCAMFPS 30
 
-int main() {
-  cv::VideoCapture cam(0);
-  cam.set(CV_CAP_PROP_FRAME_WIDTH, 640);
-  cam.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
+int main(int argc, char **argv) {
   cv::namedWindow("hud");
 
   cv::Mat frame;
   double offset = 0.15;
-  gcube limg, rimg;
-  gcube combined;
+  arma::cube limg = load_image(argv[1]);
+  arma::cube rimg = load_image(argv[2]);
+  arma::cube combined;
 
   for (;;) {
-    cam.read(frame);
-    if (!frame.data) {
-      printf("No data...\n");
-      continue;
-    }
-    limg.create(frame, 108, 491, 0, 480);
-    rimg.create(frame, 148, 531, 0, 480);
     // this is where we combine the images
     combined = ovr_image(limg, rimg, offset);
-    disp_gcube("hud", combined);
+    disp_image("hud", combined);
+    save_image("onepunch.png", combined);
     if (disp_keyPressed() >= 0) {
       break;
     }

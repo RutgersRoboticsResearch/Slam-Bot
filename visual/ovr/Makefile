@@ -1,21 +1,21 @@
-#CXX = g++
-CXX = nvcc
+CXX = g++
+#CXX = nvcc
 CFLAGS = `pkg-config --cflags opencv` -std=c++11 -O3
 LIBS = `pkg-config --libs opencv` -larmadillo
-OBJS = gcube.o highgui.o imgproc.o ovr.o test.o
+OBJS = highgui.o imgproc.o ovr.o test.o
 
 all: $(OBJS) ovr
 
-gcube.o: gcube.cu
+gcube.o: gcube.cpp
 	$(CXX) $(CFLAGS) -o $@ -c $<
 
-highgui.o: highgui.cu
+highgui.o: highgui.cpp
 	$(CXX) $(CFLAGS) -o $@ -c $<
 
-imgproc.o: imgproc.cu
+imgproc.o: imgproc.cpp
 	$(CXX) $(CFLAGS) -o $@ -c $<
 
-ovr.o: ovr.cu
+ovr.o: ovr.cpp
 	$(CXX) $(CFLAGS) -o $@ -c $<
 
 test.o: test2.cpp
