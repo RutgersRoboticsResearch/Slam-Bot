@@ -34,31 +34,31 @@ int limit(int x, int a, int b) {
 void setmotors(int topv, int btmv) {
   bool topisneg = topv < 0;
   bool btmisneg = btmv < 0;
-  topv = limit(abs(topv), 0, 255);
-  btmv = limit(abs(btmv), 0, 255);
+  topv = limit(abs(topv), 0, 128);
+  btmv = limit(abs(btmv), 0, 128);
   motors[0]->setSpeed(topv);
-  motors[1]->setSpeed(btmv);
+  motors[1]->setSpeed(topv);
   motors[2]->setSpeed(btmv);
-  motors[3]->setSpeed(topv);
+  motors[3]->setSpeed(btmv);
   if (topv == 0) {
     motors[0]->run(RELEASE);
-    motors[3]->run(RELEASE);
+    motors[1]->run(RELEASE);
   } else if (topisneg) {
-    motors[0]->run(BACKWARD);
-    motors[3]->run(BACKWARD);
-  } else {
     motors[0]->run(FORWARD);
-    motors[3]->run(FORWARD);
+    motors[1]->run(FORWARD);
+  } else {
+    motors[0]->run(BACKWARD);
+    motors[1]->run(BACKWARD);
   }
   if (btmv == 0) {
-    motors[1]->run(RELEASE);
+    motors[3]->run(RELEASE);
     motors[2]->run(RELEASE);
   } else if (btmisneg) {
-    motors[1]->run(BACKWARD);
-    motors[2]->run(BACKWARD);
-  } else {
-    motors[1]->run(FORWARD);
+    motors[3]->run(FORWARD);
     motors[2]->run(FORWARD);
+  } else {
+    motors[3]->run(BACKWARD);
+    motors[2]->run(BACKWARD);
   }
 }
 

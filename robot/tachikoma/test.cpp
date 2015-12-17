@@ -77,8 +77,6 @@ int main() {
             case SDLK_h: key_pressed[KEYID('h')] = 1; break;
             case SDLK_i: key_pressed[KEYID('i')] = 1; break;
             case SDLK_j: key_pressed[KEYID('j')] = 1; break;
-            case SDLK_o: key_pressed[KEYID('o')] = 1; break;
-            case SDLK_k: key_pressed[KEYID('k')] = 1; break;
             case SDLK_p: key_pressed[KEYID('p')] = 1; break;
             case SDLK_l: key_pressed[KEYID('l')] = 1; break;
             case SDLK_q: key_pressed[KEYID('q')] = 1; break;
@@ -92,7 +90,12 @@ int main() {
             case SDLK_3: legid = 2; break;
             case SDLK_4: legid = 3; break;
             case SDLK_8: velocity_en = true; position_en = false; break;
-            case SDLK_9: velocity_en = false; position_en = true; break;
+            case SDLK_9:
+              velocity_en = false;
+              position_en = true;
+              dposestate = 0;
+              standstate = -1;
+              break;
             case SDLK_0: velocity_en = false; position_en = false; break;
             default: break;
           }
@@ -103,10 +106,8 @@ int main() {
             case SDLK_h: key_pressed[KEYID('h')] = 0; dposestate = 0; break;
             case SDLK_i: key_pressed[KEYID('i')] = 0; standstate = 1; break;
             case SDLK_j: key_pressed[KEYID('j')] = 0; standstate = 0; break;
-            case SDLK_o: key_pressed[KEYID('o')] = 0; standstate = -1; break;
-            case SDLK_k: key_pressed[KEYID('k')] = 0; standstate = 0; break;
-            case SDLK_p: key_pressed[KEYID('p')] = 0; break;
-            case SDLK_l: key_pressed[KEYID('l')] = 0; break;
+            case SDLK_p: key_pressed[KEYID('p')] = 0; standstate = -1; break;
+            case SDLK_l: key_pressed[KEYID('l')] = 0; standstate = 0; break;
             case SDLK_q: key_pressed[KEYID('q')] = 0; break;
             case SDLK_w: key_pressed[KEYID('w')] = 0; break;
             case SDLK_e: key_pressed[KEYID('e')] = 0; break;
@@ -130,11 +131,9 @@ int main() {
 
     int k_u = key_pressed[KEYID('u')];
     int k_i = key_pressed[KEYID('i')];
-    int k_o = key_pressed[KEYID('o')];
     int k_p = key_pressed[KEYID('p')];
     int k_h = key_pressed[KEYID('h')];
     int k_j = key_pressed[KEYID('j')];
-    int k_k = key_pressed[KEYID('k')];
     int k_l = key_pressed[KEYID('l')];
     int k_q = key_pressed[KEYID('q')];
     int k_w = key_pressed[KEYID('w')];
@@ -145,17 +144,16 @@ int main() {
 
     if (velocity_en) {
       printf("velocity en\n");
-      leg_vel(legid, WAIST) = (key_pressed[KEYID('u')] - key_pressed[KEYID('h')]);
-      leg_vel(legid, THIGH) = (key_pressed[KEYID('i')] - key_pressed[KEYID('j')]);
-      leg_vel(legid, KNEE) = (key_pressed[KEYID('o')] - key_pressed[KEYID('k')]);
-      wheels(legid) = (key_pressed[KEYID('p')] - key_pressed[KEYID('l')]);
+      leg_vel(legid, WAIST) = (k_u - k_h);
+      leg_vel(legid, THIGH) = (k_i - k_j);
+      wheels(legid) = (k_p - k_l);
     } else if (position_en) {
       printf("position en\n");
-      double coeff[] = { -1.0, 1.0, 1.0, -1.0 };
+      double coeff[] = { 1.0, -1.0, -1.0, 1.0 };
       for (int i = 0; i < NUM_LEGS; i++) {
+        cout << "dstate: " << coeff[i] << endl;
         leg_pos(i, WAIST) = (double)(dposestate) * M_PI_4 * coeff[i];
-        leg_pos(i, THIGH) = (double)(standstate) * M_PI_4 / 2;
-        leg_pos(i, KNEE) =  (double)(standstate) * M_PI_4 / 2;
+        leg_pos(i, THIGH) = (double)(standstate) * M_PI_4;
         switch (i) {
           case UL:
             wheels(i) = k_w - k_a - k_s + k_d - k_q + k_e;
