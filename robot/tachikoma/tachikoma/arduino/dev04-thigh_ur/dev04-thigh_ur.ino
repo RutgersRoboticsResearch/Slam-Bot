@@ -3,70 +3,14 @@
 #include "utility/Adafruit_PWMServoDriver.h"
 #include <string.h>
 
-#define DEV_ID 13
+#define DEV_ID 4
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motors[4];
 static int v;
-
-class QuadEncoder {
-  public:
-    long long pos;
-    bool reversed; // set
-    char pin[2];
-    QuadEncoder() {
-      reset();
-    }
-    int attach(int pin1, int pin2) {
-      pinMode(pin1, INPUT);
-      pinMode(pin2, INPUT);
-      pin[0] = pin1;
-      pin[1] = pin2;
-      pin_state[0] = digitalRead(pin[0]) == HIGH;
-      pin_state[1] = digitalRead(pin[1]) == HIGH;
-    }
-    int read() {
-      update();
-      return pos;
-    }
-    void reset() {
-      pin[0] = 0;
-      pin[1] = 0;
-      pos = 0;
-      velocity = 1; // velocity can either be 1 or -1
-      reversed = false;
-      pin_state[0] = 0;
-      pin_state[1] = 0;
-    }
-  private:
-    void update() {
-      if (pin[0] == 0 || pin[1] == 0)
-        return;
-      // FSA : reg :: 00 01 11 10
-      //     : rev :: 00 10 11 01
-      char new_state[2] = {
-        digitalRead(pin[0]) == HIGH,
-        digitalRead(pin[1]) == HIGH
-      };
-      char delta_state[2] = {
-        new_state[0] != pin_state[0],
-        new_state[1] != pin_state[1]
-      };
-      if (delta_state[0] && delta_state[1]) {
-        pos += velocity * 2 * (reversed ? -1 : 1);
-      } else if (delta_state[1]) {
-        velocity = (new_state[0] == new_state[1]) ? -1 : 1;
-        pos += velocity * (reversed ? -1 : 1);
-      } else if (delta_state[0]) {
-        velocity = (new_state[0] == new_state[1]) ? 1 : -1;
-        pos += velocity * (reversed ? -1 : 1);
-      }
-      pin_state[0] = new_state[0];
-      pin_state[1] = new_state[1];
-    }
-    char pin_state[2];
-    long long velocity;  // estimated
-} enc;
+static int instr_activate;
+static bool leg_theta_act;
+static bool leg_vel_act;
 
 const int bufsize = 256;
 const int safesize = bufsize / 2;
@@ -89,7 +33,7 @@ int limit(int x, int a, int b) {
 
 void setmotors(int v) {
   bool isneg = v < 0;
-  v = limit(abs(v), 0, 128);
+  v = limit(abs(v), 0, 255);
   motors[0]->setSpeed(v);
   motors[1]->setSpeed(v);
   motors[2]->setSpeed(v);
@@ -99,16 +43,16 @@ void setmotors(int v) {
     motors[1]->run(RELEASE);
     motors[2]->run(RELEASE);
     motors[3]->run(RELEASE);
-  } else if (isneg) {
-    motors[0]->run(BACKWARD);
-    motors[1]->run(FORWARD);
-    motors[2]->run(FORWARD);
-    motors[3]->run(BACKWARD);
-  } else {
+  } else if (!isneg) {
     motors[0]->run(FORWARD);
     motors[1]->run(BACKWARD);
     motors[2]->run(BACKWARD);
     motors[3]->run(FORWARD);
+  } else {
+    motors[0]->run(BACKWARD);
+    motors[1]->run(FORWARD);
+    motors[2]->run(FORWARD);
+    motors[3]->run(BACKWARD);
   }
 }
 
@@ -118,7 +62,7 @@ void setup() {
   motors[2] = AFMS.getMotor(3);
   motors[3] = AFMS.getMotor(4);
 
-  enc.attach(4, 5);
+  pinMode(A0, INPUT);
 
   pinMode(13, OUTPUT); // set status LED to OUTPUT and HIGH
   digitalWrite(13, HIGH);
@@ -132,6 +76,7 @@ void setup() {
 
 static int targetv;
 static int prevv;
+static int targetp;
 
 void loop() {
   int nbytes = 0;
@@ -153,8 +98,12 @@ void loop() {
       e[0] = '\0';
       if ((s = strrchr(buf, '['))) {
         // CUSTOMIZE
-        sscanf(s, "[%d]\n",
+        sscanf(s, "[%d %d %d]\n",
+          &instr_activate,
+          &targetp,
           &targetv);
+        leg_theta_act = instr_activate & 0x01;
+        leg_vel_act = (instr_activate & 0x02) >> 1;
         timeout = millis();
       }
       memmove(buf, &e[1], strlen(&e[1]) + sizeof(char));
@@ -168,16 +117,21 @@ void loop() {
     prevv = 0;
   }
 
+  if (leg_vel_act) {
+    // do nothing, this will override all the later statements
+  } else if (leg_theta_act) {
+    targetv = (targetp - analogRead(A0)) * 3;
+  }
+
   int deltav = limit(targetv - prevv, -4, 4);
   v = limit(prevv + deltav, -255, 255);
   setmotors(v);
   prevv = v;
-  enc.read();
 
   if (millis() - msecs > 100) {
     sprintf(wbuf, "[%d %d %d]\n",
       DEV_ID,
-      enc.read(),
+      analogRead(A0),
       v);
     Serial.print(wbuf);
     msecs = millis();

@@ -34,8 +34,8 @@ int limit(int x, int a, int b) {
 void setmotors(int topv, int btmv) {
   bool topisneg = topv < 0;
   bool btmisneg = btmv < 0;
-  topv = limit(abs(topv), 0, 128);
-  btmv = limit(abs(btmv), 0, 128);
+  topv = limit(abs(topv), 0, 255);
+  btmv = limit(abs(btmv), 0, 255);
   motors[0]->setSpeed(topv);
   motors[1]->setSpeed(btmv);
   motors[2]->setSpeed(btmv);

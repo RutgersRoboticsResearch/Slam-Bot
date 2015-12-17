@@ -3,7 +3,7 @@
 #include "utility/Adafruit_PWMServoDriver.h"
 #include <string.h>
 
-#define DEV_ID 11
+#define DEV_ID 7
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motors[4];
@@ -89,7 +89,7 @@ int limit(int x, int a, int b) {
 
 void setmotors(int v) {
   bool isneg = v < 0;
-  v = limit(abs(v), 0, 128);
+  v = limit(abs(v), 0, 255);
   motors[0]->setSpeed(v);
   motors[1]->setSpeed(v);
   motors[2]->setSpeed(v);
@@ -101,13 +101,13 @@ void setmotors(int v) {
     motors[3]->run(RELEASE);
   } else if (isneg) {
     motors[0]->run(BACKWARD);
-    motors[1]->run(FORWARD);
-    motors[2]->run(FORWARD);
+    motors[1]->run(BACKWARD);
+    motors[2]->run(BACKWARD);
     motors[3]->run(BACKWARD);
   } else {
     motors[0]->run(FORWARD);
-    motors[1]->run(BACKWARD);
-    motors[2]->run(BACKWARD);
+    motors[1]->run(FORWARD);
+    motors[2]->run(FORWARD);
     motors[3]->run(FORWARD);
   }
 }
