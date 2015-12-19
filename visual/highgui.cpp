@@ -1,6 +1,6 @@
 #include <cmath>
 #include <cstdint>
-#include <opencv3/highgui/highgui.hpp>
+#include <opencv2/highgui/highgui.hpp>
 #include "highgui.h"
 
 static int limit(int x, int minv, int maxv);

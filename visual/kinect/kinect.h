@@ -3,15 +3,15 @@
 
 #include <cstdint>
 #include <vector>
-#include <pthread.h>
 #include <libfreenect.hpp>
 #include <opencv2/core/core.hpp>
-#include <armadillo>
+#include <thread>
+#include <mutex>
 
 class KinectDevice : public Freenect::FreenectDevice {
   private:
-    pthread_mutex_t depth_lock;
-    pthread_mutex_t video_lock;
+    std::mutex video_lock;
+    std::mutex depth_lock;
     std::vector<uint8_t> depth_buffer;
     std::vector<uint8_t> video_buffer;
     std::vector<uint16_t> gamma_buffer;
@@ -21,8 +21,8 @@ class KinectDevice : public Freenect::FreenectDevice {
     cv::Mat videoMat;
 
     bool new_distance_frame;
-    arma::mat distanceMat;
-    double raw2meters(int raw);
+    cv::Mat distanceMat;
+    double raw2meters(uint16_t raw);
 
   public:
     KinectDevice(freenect_context *_ctx, int _index);
@@ -31,21 +31,12 @@ class KinectDevice : public Freenect::FreenectDevice {
     void DepthCallback(void *data, uint32_t timestamp);
     // Do not call directly even in child
     void VideoCallback(void *data, uint32_t timestamp);
-    cv::Mat getDepth(void);
-    cv::Mat getVideo(void);
-    arma::mat getDistance(void);
-};
+    bool getDepth(cv::Mat &output);
+    bool getVideo(cv::Mat &output);
+    bool getDistance(cv::Mat &output);
 
-class Kinect {
-  private:
-    Freenect::Freenect f;
-    void *device;
-    bool is_open;
-
-  public:
-    Kinect(void);
-    bool open(void);
-    bool isOpened(void);
+    int rows;
+    int cols;
 };
 
 #endif

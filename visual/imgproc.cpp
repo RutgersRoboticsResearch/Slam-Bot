@@ -117,9 +117,8 @@ mat edge2(const mat &F, uword n, double sigma2, bool isSobel, bool isDoG) {
     mat G = gauss2(n, sigma2);
     // smooth first
     mat H = conv2(F, G);
-    vector<mat> dxdy = gradient2(H);
-    mat X = dxdy[0];
-    mat Y = dxdy[1];
+    mat X, Y;
+    gradient2(X, Y, H);
     G = sqrt(X % X + Y % Y);
     return G;
   } else if (isDoG) {
@@ -330,7 +329,8 @@ double ncc2(const mat &I1, const mat &I2) {
 
 mat harris2(const mat &I, const mat &W) {
   assert(W.n_rows == W.n_cols);
-  std::vector<mat> G = gradient2(I); // grab the gradients
+  std::vector<mat> G(2);
+  gradient2(G[0], G[1], I); // grab the gradients
   // place gradients into padded matrix
   mat wIxx = conv2(G[0] % G[0], W);
   mat wIxy = conv2(G[0] % G[1], W);
@@ -433,6 +433,8 @@ mat imresize2(const mat &A, uword m, uword n) {
       }
       if (total != 0.0) {
         G(i, j) /= total;
+      } else {
+        G(i, j) = 0.0;
       }
     }
   }
@@ -469,10 +471,10 @@ vector< vector<mat> > gausspyr2(const mat &I, int noctaves, int nscales, double 
     for (int s = 0; s < nscales; s++) {
       double var = sigma2 * s;
       mat B;
-      if (i == 0) {
+      if (o == 0) {
         B = I;
       } else {
-        B = pyramid[l - 1][i];
+        B = pyramid[s - 1][o];
         B = imresize2(B, B.n_rows / 2, B.n_cols / 2);
       }
       octave.push_back(conv2(B, gauss2(kernel_size, var)));

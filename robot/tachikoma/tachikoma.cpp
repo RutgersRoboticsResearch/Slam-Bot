@@ -319,18 +319,13 @@ vec Tachikoma::recv(
 }
 
 bool Tachikoma::set_calibration_params(const string &filename) {
-  FILE *fp;
-  fp = fopen(filename.c_str(), "r");
-  if (!fp) {
-    return false;
+  string params;
+  ifstream params_file(filename);
+  string temp;
+  while (getline(params_file, temp)) {
+    params += temp;
   }
-  int beg = ftell(fp);
-  fseek(fp, 0, SEEK_END);
-  int end = ftell(fp);
-  fseek(fp, 0, SEEK_SET);
-  char *buf = new char[end - beg + 1];
-  size_t bytesread = fread((void *)buf, sizeof(char), (size_t)(end - beg), fp);
-  buf[bytesread] = '\0';
+  params_file.close();
   this->set_calibration_params(json::parse(buf));
   delete buf;
   return true;

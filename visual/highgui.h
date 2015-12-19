@@ -2,7 +2,7 @@
 #define __TK_HIGHGUI_H__
 
 #include <string>
-#include <opencv3/core/core.hpp>
+#include <opencv2/core/core.hpp>
 
 #ifndef __NVCC__
 

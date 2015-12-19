@@ -1,11 +1,13 @@
 #include <cmath>
 #include <cstdio>
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include "kinect.h"
 
 using namespace cv;
 using namespace std;
 
-static int kinectCount;
+//static int kinectCount;
 
 /* This file accesses the Kinect Device and gets its video and depth frames. If a depth frame is deteced, a new distance frame is created as well */
 
@@ -19,80 +21,77 @@ KinectDevice::KinectDevice(freenect_context *_ctx, int _index) :
     depthMat(Size(640, 480), CV_16UC1),
     videoMat(Size(640, 480), CV_8UC3),
     new_distance_frame(false),
-    distanceMat(640, 480, arma::fill::zeros) {
+    distanceMat(Size(640, 480), CV_64F),
+    rows(640),
+    cols(480) {
   int i;
   for (i = 0; i < 2048; i++) {
     float v = i / 2048.0;
     v = pow(v, 3) * 6;
     this->gamma_buffer[i] = v * 6 * 256;
   }
-  pthread_mutex_init(&depth_lock, NULL);
-  pthread_mutex_init(&video_lock, NULL);
 }
 
 KinectDevice::~KinectDevice() {
-  pthread_mutex_destroy(&depth_lock);
-  pthread_mutex_destroy(&video_lock);
 }
 
 void KinectDevice::DepthCallback(void *data, uint32_t timestamp) {
-  pthread_mutex_lock(&depth_lock);
-  depthMat.data = (uint8_t *)(uint16_t *)data;
-  new_depth_frame = true;
-  new_distance_frame = true;
-  pthread_mutex_unlock(&depth_lock);
+  this->depth_lock.lock();
+  this->depthMat.data = (uint8_t *)(uint16_t *)data;
+  this->new_depth_frame = true;
+  this->new_distance_frame = true;
+  this->depth_lock.unlock();
 }
 
 void KinectDevice::VideoCallback(void *data, uint32_t timestamp) {
-  pthread_mutex_lock(&video_lock);
-  videoMat.data = (uint8_t *)data;
-  new_video_frame = true;
-  pthread_mutex_unlock(&video_lock);
+  this->video_lock.lock();
+  this->videoMat.data = (uint8_t *)data;
+  this->new_video_frame = true;
+  this->video_lock.unlock();
 }
 
 bool KinectDevice::getDepth(Mat& output) {
-  pthread_mutex_lock(&depth_lock);
-  if (new_depth_frame) {
-    depthMat.copyTo(output);
-    new_depth_frame = false;
-    pthread_mutex_unlock(&depth_lock);
+  this->depth_lock.lock();
+  if (this->new_depth_frame) {
+    this->depthMat.copyTo(output);
+    this->new_depth_frame = false;
+    this->depth_lock.unlock();
     return true;
   } else {
-    depthMat.copyTo(output);
-    pthread_mutex_unlock(&depth_lock);
+    this->depthMat.copyTo(output);
+    this->depth_lock.unlock();
     return false;
   }
 }
 
 bool KinectDevice::getVideo(Mat& output) {
-  pthread_mutex_lock(&video_lock);
-  if (new_video_frame) {
-    cvtColor(videoMat, output, CV_RGB2BGR);
-    new_video_frame = false;
-    pthread_mutex_unlock(&video_lock);
+  this->video_lock.lock();
+  if (this->new_video_frame) {
+    cvtColor(this->videoMat, output, COLOR_RGB2BGR);
+    this->new_video_frame = false;
+    this->video_lock.unlock();
     return true;
   } else {
-    cvtColor(videoMat, output, CV_RGB2BGR);
-    pthread_mutex_unlock(&video_lock);
+    cvtColor(this->videoMat, output, COLOR_RGB2BGR);
+    this->video_lock.unlock();
     return false;
   }
 }
 
-arma::mat KinectDevice::getDistanceMat(void) {
-  if (new_depth_frame) {
-    getDepth(depthMat);
-  }
-  if (new_meters_frame) {
-    for (int y = 0; y < depthMat.rows; y++) {
-      for (int x = 0; x < depthMat.cols; x++) {
-        distanceMat(y, x) = raw2meters(depthMat.at<uint16_t>(y, x));
+bool KinectDevice::getDistance(Mat &output) {
+  this->depth_lock.lock();
+  if (this->new_distance_frame) {
+    for (int y = 0; y < this->depthMat.rows; y++) {
+      for (int x = 0; x < this->depthMat.cols; x++) {
+        this->distanceMat.at<double>(y, x) = raw2meters(this->depthMat.at<uint16_t>(y, x));
       }
     }
-    distanceMat.copyTo(output);
-    new_meters_frame = false;
+    this->new_distance_frame = false;
+    this->depth_lock.unlock();
     return true;
   } else {
-    distanceMat.copyTo(output);
+    this->distanceMat.copyTo(output);
+    this->depth_lock.unlock();
     return false;
   }
 }
@@ -100,21 +99,4 @@ arma::mat KinectDevice::getDistanceMat(void) {
 double KinectDevice::raw2meters(uint16_t raw) {
   // stephane maganate
   return (0.1236 * tan((double)raw / 2842.5 + 1.1863));
-}
-
-Kinect::Kinect(void) {
-  this->device = NULL;
-  this->is_open = false;
-}
-
-bool Kinect::open(void) {
-  KinectDevice &kinect = f.createDevice<KinectDevice>(kinectCount);
-  kinectCount++;
-  this->device = (void *)&kinect;
-  this->is_open = true;
-  return true;
-}
-
-bool Kinect::isOpened(void) {
-  return this->is_open;
 }

@@ -276,14 +276,31 @@ __global__ void GPU_bilinear_filter2(float *G, float *F, int G_rows, int G_cols,
   float dy = 1.0f - (y - floorf(y));
   float dx = 1.0f - (x - floorf(x));
   float wsum = 0.0f;
-  float total = 4.0f;
-  // TODO: do out of bounds check here
+  float total = 0.0f;
   for (int k = 0; k < n_slices; k++) {
-    wsum = dx * dy * F[IJK2C(Fi, Fj, k, F_rows, F_cols)] +
-           dx * (1-dy) * F[IJK2C(Fi+1, Fj, k, F_rows, F_cols)] +
-           (1-dx) * dy * F[IJK2C(Fi, Fj+1, k, F_rows, F_cols)] +
-           (1-dx) * (1-dy) * F[IJK2C(Fi+1, Fj+1, k, F_rows, F_cols)];
-    G[IJK2C(i, j, k, G_rows, G_cols)] = wsum / total; // normalize
+    if (Fj >= 0 && Fj < F_cols) {
+      if (Fi >= 0 && Fi < F_rows) {
+        wsum += dx * dy * F[IJK2C(Fi, Fj, k, F_rows, F_cols)];
+        total += dx * dy;
+      }
+      if (Fi+1 >= 0 && Fi+1 < F_rows) {
+        wsum += dx * (1-dy) * F[IJK2C(Fi+1, Fj, k, F_rows, F_cols)];
+        total += dx * (1-dy);
+      }
+    }
+    if (Fj+1 >= 0 && Fj+1 < F_cols) {
+      if (Fi >= 0 && Fi < F_rows) {
+        wsum += (1-dx) * dy * F[IJK2C(Fi, Fj+1, k, F_rows, F_cols)];
+        total += (1-dx) * dy;
+      }
+      if (Fi+1 >= 0 && Fi < F_cols) {
+        wsum += (1-dx) * (1-dy) * F[IJK2C(Fi+1, Fj+1, k, F_rows, F_cols)];
+        total += (1-dx) * (1-dy);
+      }
+    }
+    if (total != 0.0f) {
+      G[IJK2C(i, j, k, G_rows, G_cols)] = wsum / total; // normalize
+    }
   }
 }
 
